@@ -1,71 +1,50 @@
+import { HapticTab } from '@/components/HapticTab';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks';
+import { rootTabs } from '@/src/features/app-shell/config/tabs';
+import { Feather } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 import React from 'react';
-import { SymbolView } from 'expo-symbols';
-import { Link, Tabs } from 'expo-router';
-import { Platform, Pressable } from 'react-native';
-
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const theme = Colors[colorScheme];
+
+  const tabNameMap: Record<(typeof rootTabs)[number]['id'], string> = {
+    home: 'index',
+    jobs: 'applications',
+    search: 'search',
+    bookmarks: 'bookmarks',
+    profile: 'profile',
+  };
 
   return (
     <Tabs
+      detachInactiveScreens={false}
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
+        headerShown: false,
+        tabBarActiveTintColor: theme.tabIconSelected,
+        tabBarInactiveTintColor: theme.tabIconDefault,
+        tabBarStyle: {
+          backgroundColor: theme.background,
+          borderTopColor: theme.border,
+        },
       }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable style={{ marginRight: 15 }}>
-                {({ pressed }) => (
-                  <SymbolView
-                    name={{ ios: 'info.circle', android: 'info', web: 'info' }}
-                    size={25}
-                    tintColor={Colors[colorScheme].text}
-                    style={{ opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-        }}
-      />
+      {rootTabs.map((tab) => (
+        <Tabs.Screen
+          key={tab.id}
+          name={tabNameMap[tab.id]}
+          options={{
+            title: tab.label,
+            tabBarAccessibilityLabel: tab.accessibilityLabel,
+            tabBarIcon: ({ color }) => (
+              <Feather name={tab.icon as React.ComponentProps<typeof Feather>['name']} size={20} color={color} />
+            ),
+            tabBarButton: (props) => <HapticTab {...props} />,
+            headerShown: false,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }
