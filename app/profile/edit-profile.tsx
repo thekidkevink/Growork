@@ -243,7 +243,7 @@ export default function EditProfileNative() {
           title:
             editedProfile.user_type === UserType.Business
               ? primaryCompany
-                ? "Manage Business Account"
+                ? "Manage Account"
                 : "Finish Business Setup"
               : "Set Up Business Account",
           subtitle:
@@ -331,7 +331,7 @@ export default function EditProfileNative() {
         surname: editedProfile.surname.trim(),
         username: editedProfile.username.trim(),
         bio: editedProfile.bio.trim(),
-        user_type: editedProfile.user_type,
+        user_type: profile.user_type,
         website: editedProfile.website.trim(),
         phone: editedProfile.phone.trim(),
         location: editedProfile.location.trim(),

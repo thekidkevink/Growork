@@ -44,6 +44,13 @@ export default function CompaniesManagement() {
     useCompanyFollows();
   const [loading, setLoading] = useState(true);
   const toast = useFlashToast();
+  const companyLimit =
+    typeof profile?.company_limit_override === "number" &&
+    Number.isFinite(profile.company_limit_override) &&
+    profile.company_limit_override >= 0
+      ? profile.company_limit_override
+      : 2;
+  const hasReachedCompanyLimit = companies.length >= companyLimit;
 
   useEffect(() => {
     if (user) {
@@ -80,6 +87,16 @@ export default function CompaniesManagement() {
   const handleCreateCompany = () => {
     if (!isBusinessUser) {
       setShowBusinessPrompt(true);
+      return;
+    }
+    if (hasReachedCompanyLimit) {
+      toast.show({
+        type: "info",
+        title: "Company limit reached",
+        message: `This account can create up to ${companyLimit} company ${
+          companyLimit === 1 ? "profile" : "profiles"
+        }.`,
+      });
       return;
     }
     router.push("/profile/CompanyManagement");
@@ -147,6 +164,7 @@ export default function CompaniesManagement() {
               <TouchableOpacity
                 style={[styles.addButton, { borderColor }]}
                 onPress={handleCreateCompany}
+                disabled={hasReachedCompanyLimit}
               >
                 <Feather name="plus" size={16} color={textColor} />
                 <ThemedText
@@ -156,6 +174,13 @@ export default function CompaniesManagement() {
                 </ThemedText>
               </TouchableOpacity>
             </View>
+            <ThemedText
+              style={[styles.limitHint, { color: mutedTextColor }]}
+            >
+              {hasReachedCompanyLimit
+                ? `You have reached this account's company limit of ${companyLimit}.`
+                : `${Math.max(companyLimit - companies.length, 0)} of ${companyLimit} company slots remaining.`}
+            </ThemedText>
 
             {companies.length === 0 ? (
               <ThemedView style={styles.emptyState}>
@@ -409,6 +434,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
+  },
+  limitHint: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -8,
+    marginBottom: 16,
   },
   addButton: {
     flexDirection: "row",

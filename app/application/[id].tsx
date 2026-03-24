@@ -133,8 +133,14 @@ export default function ApplicationDetailScreen() {
       return;
     }
 
-    Linking.openURL(url).catch((err) => {
-      Alert.alert("Error", `Could not open ${documentType.toLowerCase()}`);
+    const normalizedType = documentType.replace(/\s+/g, "_").toLowerCase();
+    router.push({
+      pathname: "/document-viewer",
+      params: {
+        url: encodeURIComponent(url),
+        title: encodeURIComponent(documentType),
+        type: encodeURIComponent(normalizedType),
+      },
     });
   };
 
@@ -843,7 +849,7 @@ export default function ApplicationDetailScreen() {
                         </ThemedText>
                       </View>
                       <Feather
-                        name="external-link"
+                        name="chevron-right"
                         size={18}
                         color={mutedTextColor}
                       />

@@ -189,8 +189,6 @@ export async function sendNotification(
 
     if (expoPushToken) {
       await sendPushNotification(expoPushToken, title, body, data);
-    } else {
-      await scheduleLocalNotification(title, body, data);
     }
   } catch (error) {
     console.error('Error sending notification:', error);

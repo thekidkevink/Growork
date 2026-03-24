@@ -1,9 +1,19 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useAuth } from "../auth/useAuth";
 import { Company } from "@/types/company";
+import { UserType } from "@/types/enums";
 import { supabase } from "@/utils/supabase";
 
 const VALID_COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "500+"];
+const DEFAULT_COMPANY_LIMIT = 2;
+
+const resolveCompanyLimit = (override: number | null | undefined) => {
+  if (typeof override === "number" && Number.isFinite(override) && override >= 0) {
+    return override;
+  }
+
+  return DEFAULT_COMPANY_LIMIT;
+};
 
 const normalizeCompany = (company: any): Company => ({
   ...company,
@@ -30,7 +40,37 @@ export const useCompanies = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
+  const companyLimit = useMemo(
+    () => resolveCompanyLimit(profile?.company_limit_override),
+    [profile?.company_limit_override]
+  );
+  const hasCompanyLimitOverride = useMemo(
+    () =>
+      typeof profile?.company_limit_override === "number" &&
+      Number.isFinite(profile.company_limit_override) &&
+      profile.company_limit_override >= 0,
+    [profile?.company_limit_override]
+  );
+  const remainingCompanySlots = Math.max(companyLimit - companies.length, 0);
+  const hasReachedCompanyLimit = companies.length >= companyLimit;
+
+  const fetchOwnedCompanyCount = useCallback(async () => {
+    if (!user) {
+      return 0;
+    }
+
+    const { count, error: countError } = await supabase
+      .from("companies")
+      .select("id", { count: "exact", head: true })
+      .or(`user_id.eq.${user.id},owner_id.eq.${user.id}`);
+
+    if (countError) {
+      throw countError;
+    }
+
+    return count ?? 0;
+  }, [user]);
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -79,6 +119,15 @@ export const useCompanies = () => {
           };
         }
 
+        const currentCompanyCount = await fetchOwnedCompanyCount();
+        if (currentCompanyCount >= companyLimit) {
+          return {
+            error: `You can create up to ${companyLimit} company ${
+              companyLimit === 1 ? "profile" : "profiles"
+            } on this account.`,
+          };
+        }
+
         const cleanedData = sanitizeCompanyPayload(user.id, companyData);
 
         const { data, error } = await supabase
@@ -99,7 +148,7 @@ export const useCompanies = () => {
         return { error: err.message };
       }
     },
-    [user]
+    [companyLimit, fetchOwnedCompanyCount, user]
   );
 
   const updateCompany = useCallback(
@@ -153,13 +202,32 @@ export const useCompanies = () => {
 
       if (error) throw error;
 
-      setCompanies((prev) => prev.filter((company) => company.id !== id));
+      const remainingCompanies = companies.filter((company) => company.id !== id);
+      setCompanies(remainingCompanies);
+
+      if (
+        user?.id &&
+        profile?.user_type === UserType.Business &&
+        remainingCompanies.length === 0
+      ) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ user_type: UserType.User })
+          .eq("id", user.id);
+
+        if (profileError) {
+          throw profileError;
+        }
+
+        await refreshProfile();
+      }
+
       return { success: true };
     } catch (err: any) {
       console.error("Error deleting company:", err.message);
       return { error: err.message };
     }
-  }, []);
+  }, [companies, profile?.user_type, refreshProfile, user?.id]);
 
   const getCompanyById = useCallback(async (id: string) => {
     try {
@@ -282,6 +350,10 @@ export const useCompanies = () => {
     companies,
     loading,
     error,
+    companyLimit,
+    remainingCompanySlots,
+    hasReachedCompanyLimit,
+    hasCompanyLimitOverride,
     fetchCompanies,
     createCompany,
     updateCompany,

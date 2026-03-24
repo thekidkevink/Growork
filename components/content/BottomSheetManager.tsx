@@ -52,7 +52,7 @@ export function useBottomSheetManager(props?: BottomSheetManagerProps) {
     );
   }, []);
 
-  const openCreatePostSheet = useCallback(() => {
+  const openCreatePostSheet = useCallback((initialPost?: Post | null) => {
     openGlobalSheet({
       dynamicSnapPoint: true,
       dynamicOptions: {
@@ -61,7 +61,7 @@ export function useBottomSheetManager(props?: BottomSheetManagerProps) {
         padding: 80, // Increased padding for better keyboard spacing
       },
       children: withKeyboardAvoidance(
-        <CreatePostSheetUI onSuccess={onPostSuccess} />
+        <CreatePostSheetUI onSuccess={onPostSuccess} initialPost={initialPost} />
       ),
     });
   }, [onPostSuccess]);

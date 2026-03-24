@@ -189,12 +189,19 @@ export default function MyPostsList() {
     }
   };
 
+  const handlePostEdit = (post: MyPost) => {
+    setTimeout(() => {
+      openCreatePostSheet(post);
+    }, 200);
+  };
+
   const renderPostItem = ({ item }: { item: MyPost }) => {
     return (
       <MyPostCard
         post={item}
         onStatusUpdate={handlePostStatusUpdate}
         onDelete={handlePostDelete}
+        onEdit={handlePostEdit}
       />
     );
   };

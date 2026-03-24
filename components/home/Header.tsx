@@ -49,7 +49,7 @@ const Header = ({
       <View style={styles.topRow}>
         <Image
           source={require("@/assets/logo.png")}
-          style={styles.logoImage}
+          style={[styles.logoImage, { tintColor: "#000000" }]}
           resizeMode="contain"
         />
         <View style={{ flexDirection: "row", alignItems: "center" }}>

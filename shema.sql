@@ -175,6 +175,7 @@ CREATE TABLE public.profiles (
   experience_years integer,
   education text,
   skills text[],
+  company_limit_override integer,
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );

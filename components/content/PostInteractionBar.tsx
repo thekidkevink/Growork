@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Platform, Share } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useThemeColor, useCustomCommentsBottomSheet } from '@/hooks';
 import { useInteractions } from '@/hooks/posts/useInteractions';
 import { ThemedText } from '@/components/ThemedText';
+import { supabase } from '@/utils/supabase';
 
 
 interface PostInteractionBarProps {
@@ -29,7 +30,7 @@ export default function PostInteractionBar({
     bookmarkStates, 
     initializePost 
   } = useInteractions();
-  const { openCommentsSheet } = useCustomCommentsBottomSheet();
+  const { openCommentsSheet, isVisible, currentPostId } = useCustomCommentsBottomSheet();
 
   // UI state - now directly synced with global state
   const [commentCount, setCommentCount] = useState(0);
@@ -39,13 +40,49 @@ export default function PostInteractionBar({
   const tintColor = useThemeColor({}, 'tint');
 
   const iconSize = 20;
+  const wasViewingThisPostsComments = useRef(false);
+
+  const fetchCommentCount = useCallback(async () => {
+    if (!postId) {
+      setCommentCount(0);
+      return;
+    }
+
+    try {
+      const { count, error } = await supabase
+        .from('comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('post_id', postId);
+
+      if (error) {
+        throw error;
+      }
+
+      setCommentCount(count ?? 0);
+    } catch (error) {
+      console.error('Comment count fetch error:', error);
+    }
+  }, [postId]);
 
   useEffect(() => {
     if (postId) {
       // Initialize post state if not already done
       initializePost(postId);
+      fetchCommentCount();
     }
-  }, [postId, initializePost]);
+  }, [postId, initializePost, fetchCommentCount]);
+
+  useEffect(() => {
+    if (isVisible && currentPostId === postId) {
+      wasViewingThisPostsComments.current = true;
+      return;
+    }
+
+    if (!isVisible && wasViewingThisPostsComments.current) {
+      wasViewingThisPostsComments.current = false;
+      fetchCommentCount();
+    }
+  }, [isVisible, currentPostId, postId, fetchCommentCount]);
 
   // Get current states directly from global state
   const liked = likeStates[postId]?.isLiked || false;

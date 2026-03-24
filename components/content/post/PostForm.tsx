@@ -11,7 +11,7 @@ import {
 import { ThemedInput } from "@/components/ThemedInput";
 import { ThemedText } from "@/components/ThemedText";
 import Button from "@/components/ui/Button";
-import { PostType } from "@/types";
+import { Post, PostType } from "@/types";
 import { usePostForm } from "./usePostForm";
 import PostTypeSelector from "./PostTypeSelector";
 import JobFields from "./JobFields";
@@ -22,6 +22,9 @@ import { useFlashToast } from "@/components/ui/Flash";
 import { Spacing, Typography, BorderRadius } from "@/constants/DesignSystem";
 import { useThemeColor } from "@/hooks";
 
+const formatSalaryLabel = (salary?: string) =>
+  salary ? salary.replace(/\$/g, "N$") : salary;
+
 export enum WizardStep {
   BasicInfo = 0,
   DetailsInfo = 1,
@@ -31,9 +34,10 @@ export enum WizardStep {
 interface PostFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
+  initialPost?: Post | null;
 }
 
-export default function PostForm({ onSuccess, onCancel }: PostFormProps) {
+export default function PostForm({ onSuccess, onCancel, initialPost }: PostFormProps) {
   const toast = useFlashToast();
   const [currentStep, setCurrentStep] = useState<WizardStep>(
     WizardStep.BasicInfo
@@ -56,7 +60,7 @@ export default function PostForm({ onSuccess, onCancel }: PostFormProps) {
     setArticleFields,
     handleSubmit,
     isFormValid,
-  } = usePostForm(onSuccess);
+  } = usePostForm(onSuccess, initialPost);
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -116,7 +120,7 @@ export default function PostForm({ onSuccess, onCancel }: PostFormProps) {
       case WizardStep.Review:
         return "Review Post";
       default:
-        return "Create Post";
+        return initialPost ? "Edit Post" : "Create Post";
     }
   };
 
@@ -131,10 +135,12 @@ export default function PostForm({ onSuccess, onCancel }: PostFormProps) {
       case WizardStep.BasicInfo:
         return (
           <View style={{ gap: Spacing.md }}>
-            <PostTypeSelector
-              selectedPostType={postType}
-              onPostTypeChange={handlePostTypeChange}
-            />
+            {!initialPost ? (
+              <PostTypeSelector
+                selectedPostType={postType}
+                onPostTypeChange={handlePostTypeChange}
+              />
+            ) : null}
             <ThemedInput
               placeholder="Enter a title for your post"
               value={title}
@@ -265,7 +271,7 @@ export default function PostForm({ onSuccess, onCancel }: PostFormProps) {
                     <ThemedText
                       style={[styles.detailValue, { color: textColor }]}
                     >
-                      {jobFields.salary}
+                      {formatSalaryLabel(jobFields.salary)}
                     </ThemedText>
                   </View>
                 )}
@@ -376,8 +382,8 @@ export default function PostForm({ onSuccess, onCancel }: PostFormProps) {
             {atFirstStep ? "Cancel" : "Back"}
           </ThemedText>
 
-          <Button
-            title={atLastStep ? "Post" : "Next"}
+            <Button
+            title={atLastStep ? (initialPost ? "Save" : "Post") : "Next"}
             onPress={handleNextStep}
             loading={loading}
             disabled={!isFormValid}

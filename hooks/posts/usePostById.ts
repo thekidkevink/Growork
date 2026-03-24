@@ -41,15 +41,34 @@ export function usePostById() {
         { logTag: 'profiles:getForPostById' }
       );
 
+      const companyId = post?.criteria?.companyId || post?.criteria?.company_id;
+      let company: any = null;
+
+      if (companyId) {
+        const { data: companyData } = await supabaseRequest<any>(
+          async () => {
+            const { data, error, status } = await supabase
+              .from("companies")
+              .select("id, name, logo_url")
+              .eq("id", companyId)
+              .maybeSingle();
+            return { data, error, status };
+          },
+          { logTag: "companies:getForPostById" }
+        );
+
+        company = companyData || null;
+      }
+
       // Return post with profile data
       const criteria = {
         ...(post.criteria || {}),
         company:
-          post?.criteria?.company || post.company_name || undefined,
+          post?.criteria?.company || post.company_name || company?.name || undefined,
         companyId:
-          post?.criteria?.companyId || post?.criteria?.company_id || undefined,
+          post?.criteria?.companyId || post?.criteria?.company_id || company?.id || undefined,
         companyLogo:
-          post?.criteria?.companyLogo || post.company_logo || undefined,
+          post?.criteria?.companyLogo || post.company_logo || company?.logo_url || undefined,
       };
 
       return {
@@ -57,8 +76,17 @@ export function usePostById() {
           ...post,
           criteria,
           profiles: profile || null,
-          company_name: post.company_name || (profile ? `${profile.name || ''} ${profile.surname || ''}`.trim() : 'Anonymous'),
-          company_image: post.company_logo || profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.company_name || 'Company')}&size=128`
+          company_name:
+            post.company_name ||
+            criteria.company ||
+            (profile ? `${profile.name || ''} ${profile.surname || ''}`.trim() : 'Anonymous'),
+          company_image:
+            post.company_logo ||
+            criteria.companyLogo ||
+            profile?.avatar_url ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              criteria.company || post.company_name || 'Company'
+            )}&size=128`
         },
         error: null
       };

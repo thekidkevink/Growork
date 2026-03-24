@@ -14,6 +14,7 @@ export interface JobFieldsData {
   industry: string;
   company: string;
   companyId?: string;
+  companyLogo?: string;
 }
 
 interface JobFieldsProps {
@@ -32,13 +33,18 @@ export default function JobFields({ values, onChange, style }: JobFieldsProps) {
       ...values,
       company: companyData.company,
       companyId: companyData.companyId,
+      companyLogo: companyData.companyLogo,
     });
   };
 
   return (
     <View style={[styles.container, style]}>
       <CompanySelector
-        values={{ company: values.company, companyId: values.companyId }}
+        values={{
+          company: values.company,
+          companyId: values.companyId,
+          companyLogo: values.companyLogo,
+        }}
         onChange={handleCompanyChange}
       />
       <ThemedInput

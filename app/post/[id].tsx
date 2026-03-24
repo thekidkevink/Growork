@@ -23,6 +23,9 @@ import {
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import ScreenContainer from "@/components/ScreenContainer";
+
+const formatSalaryLabel = (salary?: string | null) =>
+  salary ? salary.replace(/\$/g, "N$") : salary;
 import UniversalHeader from "@/components/ui/UniversalHeader";
 import { Post } from "@/types";
 import { PostType } from "@/types/enums";
@@ -271,15 +274,16 @@ const PostDetail = () => {
           <ThemedText style={styles.postTitle}>{post.title}</ThemedText>
 
           {/* Company Info - Minimal */}
-          {isJob && post.criteria?.company && (
+          {isJob && (post.criteria?.company || mainPostCompany?.name) && (
             <RNView style={styles.companyRow}>
               <Image
                 source={{
                   uri:
                     mainPostCompany?.logo_url ||
+                    post.criteria?.companyLogo ||
                     post.company_logo ||
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      post.criteria.company || "Company"
+                      post.criteria.company || mainPostCompany?.name || "Company"
                     )}&size=64`,
                 }}
                 style={styles.companyLogo}
@@ -288,13 +292,13 @@ const PostDetail = () => {
                 <ThemedText
                   style={[styles.companyName, { color: mutedTextColor }]}
                 >
-                  {post.criteria.company}
+                  {post.criteria.company || mainPostCompany?.name}
                 </ThemedText>
                 {post.criteria.location && (
                   <ThemedText
                     style={[styles.locationText, { color: mutedTextColor }]}
                   >
-                    â€¢ {post.criteria.location}
+                    | {post.criteria.location}
                   </ThemedText>
                 )}
               </RNView>
@@ -328,7 +332,7 @@ const PostDetail = () => {
                   <ThemedText
                     style={[styles.detailText, { color: mutedTextColor }]}
                   >
-                    {post.criteria.salary}
+                    {formatSalaryLabel(post.criteria.salary)}
                   </ThemedText>
                 </RNView>
               )}

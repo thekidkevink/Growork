@@ -9,8 +9,8 @@ import {
   Pressable,
   Modal,
   Animated,
+  Alert,
 } from "react-native";
-import { useActionSheet } from "@expo/react-native-action-sheet";
 import { Feather } from "@expo/vector-icons";
 
 import { useAuth, useComments, usePosts, useThemeColor } from "@/hooks";
@@ -72,8 +72,6 @@ export default function CommentsBottomSheet({
     isCommentLiked: isLiked,
     getCommentLikeCount: getLikeCount,
   } = useAppContext();
-
-  const { showActionSheetWithOptions } = useActionSheet();
 
   // UI state
   const [commentText, setCommentText] = useState<string>("");
@@ -218,23 +216,16 @@ export default function CommentsBottomSheet({
 
   const handleMenu = useCallback(
     (commentId: string) => {
-      const options = ["Delete", "Cancel"];
-      showActionSheetWithOptions(
+      Alert.alert("Comment Options", "Delete this comment?", [
+        { text: "Cancel", style: "cancel" },
         {
-          options,
-          destructiveButtonIndex: 0,
-          cancelButtonIndex: 1,
-          title: "Comment Options",
-          message: "Delete this comment?",
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteComment(commentId),
         },
-        (selectedIndex?: number) => {
-          if (selectedIndex === 0) {
-            deleteComment(commentId);
-          }
-        }
-      );
+      ]);
     },
-    [showActionSheetWithOptions, deleteComment]
+    [deleteComment]
   );
 
   const handleBackdropPress = useCallback(() => {

@@ -5,25 +5,31 @@ import { useActionSheet } from "@expo/react-native-action-sheet";
 import { useRouter } from "expo-router";
 import { useThemeColor, MyPost } from "@/hooks";
 import { ThemedText } from "@/components/ThemedText";
-import ThemedButton from "@/components/ui/ThemedButton";
 import { Typography, Spacing, BorderRadius } from "@/constants/DesignSystem";
 
 interface MyPostCardProps {
   post: MyPost;
   onStatusUpdate?: (postId: string, status: "active" | "inactive") => void;
   onDelete?: (postId: string) => void;
+  onEdit?: (post: MyPost) => void;
 }
 
 export function MyPostCard({
   post,
   onStatusUpdate,
   onDelete,
+  onEdit,
 }: MyPostCardProps) {
   const router = useRouter();
   const { showActionSheetWithOptions } = useActionSheet();
   const textColor = useThemeColor({}, "text");
   const mutedTextColor = useThemeColor({}, "mutedText");
-  const tintColor = useThemeColor({}, "tint");
+  const companyName =
+    post.criteria?.company || post.company_name || `${post.profiles?.name || ""} ${post.profiles?.surname || ""}`.trim();
+  const companyLogo =
+    post.criteria?.companyLogo || post.company_logo || post.profiles?.avatar_url || undefined;
+  const companySubtitle =
+    post.criteria?.location || post.industry || post.profiles?.profession || undefined;
 
   const getStatusColor = (isActive: boolean) => {
     return isActive ? "#34C759" : "#FF3B30";
@@ -71,14 +77,15 @@ export function MyPostCard({
 
   const openActionMenu = () => {
     const options = [
-      "View Applications",
+      "Edit Post",
+      ...(post.type === "job" ? ["View Applications"] : []),
       post.is_active ? "Pause Post" : "Activate Post",
       "Delete Post",
       "Cancel",
     ];
 
-    const cancelButtonIndex = 3;
-    const destructiveButtonIndex = 2;
+    const cancelButtonIndex = options.length - 1;
+    const destructiveButtonIndex = options.indexOf("Delete Post");
 
     showActionSheetWithOptions(
       {
@@ -87,14 +94,20 @@ export function MyPostCard({
         destructiveButtonIndex,
       },
       (selectedIndex) => {
-        switch (selectedIndex) {
-          case 0:
+        const selectedOption = selectedIndex != null ? options[selectedIndex] : null;
+
+        switch (selectedOption) {
+          case "Edit Post":
+            onEdit?.(post);
+            break;
+          case "View Applications":
             handleViewApplications();
             break;
-          case 1:
+          case "Pause Post":
+          case "Activate Post":
             handleStatusToggle();
             break;
-          case 2:
+          case "Delete Post":
             handleDelete();
             break;
         }
@@ -118,15 +131,15 @@ export function MyPostCard({
       {/* Content */}
       <View style={styles.content}>
         {/* Company Info */}
-        {post.profiles && (
+        {(companyName || post.profiles) && (
           <View style={styles.companySection}>
             <View style={styles.logoContainer}>
               <Image
                 source={{
                   uri:
-                    post.profiles.avatar_url ||
+                    companyLogo ||
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      post.profiles.name || "Company"
+                      companyName || "Company"
                     )}&size=128`,
                 }}
                 style={styles.logo}
@@ -135,13 +148,13 @@ export function MyPostCard({
             </View>
             <View style={styles.companyDetails}>
               <ThemedText style={[styles.companyName, { color: textColor }]}>
-                {post.profiles.name} {post.profiles.surname}
+                {companyName}
               </ThemedText>
-              {post.profiles.profession && (
+              {companySubtitle && (
                 <ThemedText
                   style={[styles.companyRole, { color: mutedTextColor }]}
                 >
-                  {post.profiles.profession}
+                  {companySubtitle}
                 </ThemedText>
               )}
             </View>

@@ -15,6 +15,7 @@ export interface Profile {
   experience_years: number | null;
   education: string | null;
   skills: string[] | null;
+  company_limit_override?: number | null;
   created_at: string; // ISO timestamp
   updated_at: string | null;
 }

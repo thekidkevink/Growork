@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   View,
@@ -24,6 +24,7 @@ import {
 export interface CompanySelectorData {
   company: string;
   companyId?: string;
+  companyLogo?: string;
 }
 
 interface CompanySelectorProps {
@@ -50,16 +51,30 @@ export default function CompanySelector({
     onChange({
       company: company.name,
       companyId: company.id,
+      companyLogo: company.logo_url ?? undefined,
     });
     setShowCompanySelector(false);
   };
 
   const selectedCompany = companies.find((c) => c.id === values.companyId);
 
+  useEffect(() => {
+    if (selectedCompany || companies.length !== 1) {
+      return;
+    }
+
+    const onlyCompany = companies[0];
+    onChange({
+      company: onlyCompany.name,
+      companyId: onlyCompany.id,
+      companyLogo: onlyCompany.logo_url ?? undefined,
+    });
+  }, [companies, onChange, selectedCompany]);
+
   return (
     <View style={[styles.container, style]}>
       <ThemedText style={[styles.sectionLabel, { color: textColor }]}>
-        Company
+        Posting Company
       </ThemedText>
 
       {selectedCompany ? (

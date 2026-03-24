@@ -83,10 +83,41 @@ async function deletePostRecord(postId: string) {
   return data;
 }
 
+async function updatePostRecord(postId: string, postData: PostMutationInput) {
+  const { data } = await supabaseRequest<any>(
+    async () => {
+      const { data, error, status } = await supabase
+        .from("posts")
+        .update({
+          type: postData.type,
+          title: postData.title,
+          content: postData.content,
+          image_url: postData.image_url || null,
+          industry: postData.industry || null,
+          is_sponsored: postData.is_sponsored || false,
+          criteria: postData.criteria || null,
+        })
+        .eq("id", postId)
+        .eq("user_id", postData.user_id)
+        .select("*")
+        .single();
+      return { data, error, status };
+    },
+    { logTag: "posts:update" }
+  );
+
+  return data;
+}
+
 export function usePostOperations() {
   const buildPostCard = useCallback(
     (
       post: DbPost,
+      companyData?: {
+        id: string;
+        name: string;
+        logo_url?: string | null;
+      } | null,
       profileData?: {
         avatar_url: string | null;
         name: string;
@@ -101,10 +132,20 @@ export function usePostOperations() {
       };
 
       const criteriaData = post.criteria || {};
+      const resolvedCompanyName =
+        criteriaData.company || post.company_name || companyData?.name || undefined;
+      const resolvedCompanyId =
+        criteriaData.companyId ||
+        criteriaData.company_id ||
+        companyData?.id ||
+        undefined;
+      const resolvedCompanyLogo =
+        criteriaData.companyLogo || post.company_logo || companyData?.logo_url || undefined;
       const criteria = {
-        companyId: criteriaData.companyId || criteriaData.company_id || undefined,
-        company: criteriaData.company || post.company_name || undefined,
-        companyLogo: criteriaData.companyLogo || post.company_logo || undefined,
+        companyId: resolvedCompanyId,
+        company_id: resolvedCompanyId,
+        company: resolvedCompanyName,
+        companyLogo: resolvedCompanyLogo,
         location: criteriaData.location || undefined,
         salary: criteriaData.salary || undefined,
         jobType: criteriaData.jobType || undefined,
@@ -166,7 +207,36 @@ export function usePostOperations() {
         console.warn('Error fetching profile data for post:', post.id, error);
       }
 
-      return buildPostCard(post, postProfile);
+      let companyData: {
+        id: string;
+        name: string;
+        logo_url?: string | null;
+      } | null = null;
+      const companyId = post.criteria?.companyId || post.criteria?.company_id;
+
+      if (companyId) {
+        try {
+          const { data } = await supabaseRequest<any>(
+            async () => {
+              const { data, error, status } = await supabase
+                .from("companies")
+                .select("id, name, logo_url")
+                .eq("id", companyId)
+                .maybeSingle();
+              return { data, error, status };
+            },
+            { logTag: "companies:getForPost" }
+          );
+
+          if (data) {
+            companyData = data;
+          }
+        } catch (error) {
+          console.warn("Error fetching company data for post:", post.id, error);
+        }
+      }
+
+      return buildPostCard(post, companyData, postProfile);
     },
     [buildPostCard]
   );
@@ -178,7 +248,15 @@ export function usePostOperations() {
       }
 
       const userIds = Array.from(new Set(posts.map((post) => post.user_id).filter(Boolean)));
+      const companyIds = Array.from(
+        new Set(
+          posts
+            .map((post) => post.criteria?.companyId || post.criteria?.company_id)
+            .filter(Boolean)
+        )
+      );
       let profilesById: Record<string, any> = {};
+      let companiesById: Record<string, any> = {};
 
       if (userIds.length) {
         try {
@@ -204,7 +282,40 @@ export function usePostOperations() {
         }
       }
 
-      return posts.map((post) => buildPostCard(post, profilesById[post.user_id] || null));
+      if (companyIds.length) {
+        try {
+          const { data: companiesData } = await supabaseRequest<any[]>(
+            async () => {
+              const { data, error, status } = await supabase
+                .from("companies")
+                .select("id, name, logo_url")
+                .in("id", companyIds);
+              return { data, error, status };
+            },
+            { logTag: "companies:listForPosts" }
+          );
+
+          companiesById = (companiesData || []).reduce(
+            (acc: Record<string, any>, company: any) => {
+              if (company?.id) {
+                acc[company.id] = company;
+              }
+              return acc;
+            },
+            {}
+          );
+        } catch (error) {
+          console.warn("Error batch fetching company data for posts:", error);
+        }
+      }
+
+      return posts.map((post) =>
+        buildPostCard(
+          post,
+          companiesById[post.criteria?.companyId || post.criteria?.company_id] || null,
+          profilesById[post.user_id] || null
+        )
+      );
     },
     [buildPostCard]
   );
@@ -279,11 +390,22 @@ export function usePostOperations() {
     }
   }, []);
 
+  const updatePost = useCallback(async (postId: string, postData: PostMutationInput) => {
+    try {
+      const data = await updatePostRecord(postId, postData);
+      return { data, error: null };
+    } catch (error) {
+      console.error("Error in updatePost:", error);
+      return { data: null, error };
+    }
+  }, []);
+
   return {
     convertDbPostToContentCard,
     convertDbPostsToContentCards,
     fetchPostsWithData,
     addPost,
+    updatePost,
     deletePost,
   };
 }
@@ -304,6 +426,16 @@ export const deletePost = async (postId: string) => {
     return { data, error: null };
   } catch (error) {
     console.error('Error in deletePost:', error);
+    return { data: null, error };
+  }
+};
+
+export const updatePost = async (postId: string, postData: PostMutationInput) => {
+  try {
+    const data = await updatePostRecord(postId, postData);
+    return { data, error: null };
+  } catch (error) {
+    console.error("Error in updatePost:", error);
     return { data: null, error };
   }
 };

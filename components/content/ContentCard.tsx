@@ -12,6 +12,9 @@ import ThemedButton from "../ui/ThemedButton";
 import PostInteractionBar from "./PostInteractionBar";
 import { useThemeColor } from "@/hooks";
 
+const formatSalaryLabel = (salary?: string) =>
+  salary ? salary.replace(/\$/g, "N$") : salary;
+
 // Types
 interface CompanyHeaderProps {
   companyName?: string;
@@ -148,7 +151,7 @@ const JobDetails = memo<{ criteria?: ContentCardProps["criteria"] }>(
               style={[styles.detailText, { color: mutedTextColor }]}
               numberOfLines={1}
             >
-              {criteria.salary}
+              {formatSalaryLabel(criteria.salary)}
             </ThemedText>
           </View>
         )}
@@ -327,7 +330,7 @@ const ContentCard = memo<ContentCardProps>(
             size="small"
           />
 
-          {variant === "job" && isOwnedByCurrentUser ? (
+          {isOwnedByCurrentUser ? (
             <ThemedButton
               title={ownerActionLabel}
               onPress={onPressOwnerAction || handlePress}

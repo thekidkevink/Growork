@@ -27,9 +27,15 @@ export interface PostFetchConfig {
 // Base hook for all post operations
 export function usePosts(config: PostFetchConfig = {}) {
   const { fetchPostsWithData } = usePostOperations();
+  const requiresUserScope = typeof config.userId !== "undefined";
+  const hasResolvedUserScope = !requiresUserScope || Boolean(config.userId);
 
   const fetchPosts = useCallback(async (): Promise<PostWithProfile[]> => {
     try {
+      if (!hasResolvedUserScope) {
+        return [];
+      }
+
       const postsData = await fetchPostsWithData({
         type: config.type,
         industry: config.industryFilter,
@@ -50,7 +56,7 @@ export function usePosts(config: PostFetchConfig = {}) {
       console.error('Error fetching posts:', error);
       throw error;
     }
-  }, [fetchPostsWithData, config.type, config.industryFilter, config.userId, config.limit]);
+  }, [fetchPostsWithData, config.type, config.industryFilter, config.userId, config.limit, hasResolvedUserScope]);
 
   const {
     data: posts,
@@ -60,7 +66,7 @@ export function usePosts(config: PostFetchConfig = {}) {
     refresh,
     clearError
   } = useDataFetching(fetchPosts, {
-    autoFetch: config.autoFetch ?? true,
+    autoFetch: (config.autoFetch ?? true) && hasResolvedUserScope,
     refreshOnMount: config.refreshOnMount ?? true,
     pollingInterval: config.pollingInterval
   });

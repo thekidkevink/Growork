@@ -6,9 +6,9 @@ import {
   Keyboard,
   ScrollView,
   KeyboardAvoidingView,
+  Alert,
 } from "react-native";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { useActionSheet } from "@expo/react-native-action-sheet";
 import { useAppContext } from "@/utils/AppContext";
 import { ThemedText } from "../../ThemedText";
 import { CommentItem } from "./CommentItem";
@@ -37,8 +37,6 @@ export default function Comments({
     isCommentLiked: isLiked,
     getCommentLikeCount: getLikeCount,
   } = useAppContext();
-
-  const { showActionSheetWithOptions } = useActionSheet();
 
   const [commentText, setCommentText] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
@@ -144,21 +142,14 @@ export default function Comments({
   };
 
   const handleMenu = (commentId: string) => {
-    const options = ["Delete", "Cancel"];
-    showActionSheetWithOptions(
+    Alert.alert("Comment Options", "Delete this comment?", [
+      { text: "Cancel", style: "cancel" },
       {
-        options,
-        destructiveButtonIndex: 0,
-        cancelButtonIndex: 1,
-        title: "Comment Options",
-        message: "Delete this comment?",
+        text: "Delete",
+        style: "destructive",
+        onPress: () => deleteComment(commentId),
       },
-      (selectedIndex?: number) => {
-        if (selectedIndex === 0) {
-          deleteComment(commentId);
-        }
-      }
-    );
+    ]);
   };
 
   const emojiReactions = ["❤️", "👏", "🔥", "🙏", "😢", "😊", "😮", "😂"];

@@ -62,7 +62,7 @@ export default function ProfileTab() {
       id: "business-account",
       label: isBusinessUser
         ? primaryCompany
-          ? "Manage Business Account"
+          ? "Manage Account"
           : "Finish Business Setup"
         : "Set Up Business Account",
       subtitle: isBusinessUser
@@ -74,7 +74,7 @@ export default function ProfileTab() {
       onPress: () =>
         isBusinessUser && primaryCompany?.id
           ? router.push(`/profile/CompanyManagement?id=${primaryCompany.id}`)
-          : router.push("/profile/edit-profile"),
+          : router.push("/profile/CompanyManagement?upgradeToBusiness=true"),
     },
     {
       id: "companies",

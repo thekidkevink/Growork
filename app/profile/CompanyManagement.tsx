@@ -2,11 +2,10 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   Pressable,
   StatusBar,
-  TouchableOpacity,
+  Switch,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -20,12 +19,12 @@ import { STORAGE_BUCKETS, uploadImage } from "@/utils/uploadUtils";
 import { supabase } from "@/utils/supabase";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedAvatar } from "@/components/ui/ThemedAvatar";
-import { ThemedIconButton } from "@/components/ui/ThemedIconButton";
 import SettingsList from "@/components/ui/SettingsList";
 import ScreenContainer from "@/components/ScreenContainer";
 import UniversalHeader from "@/components/ui/UniversalHeader";
 import BadgeSelector from "@/components/ui/BadgeSelector";
 import { useFlashToast } from "@/components/ui/Flash";
+import ActionPromptModal from "@/components/ui/ActionPromptModal";
 
 const CompanyManagement = () => {
   const router = useRouter();
@@ -44,11 +43,19 @@ const CompanyManagement = () => {
       upgradeToBusiness?: string;
     }>();
 
-  const { user, profile, refreshProfile } = useAuth();
+  const {
+    user,
+    profile,
+    refreshProfile,
+    loading: authLoading,
+    profileLoading,
+  } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [selectedLogoUri, setSelectedLogoUri] = useState<string | null>(null);
+  const [businessToggleEnabled, setBusinessToggleEnabled] = useState(false);
+  const [showDeletePrompt, setShowDeletePrompt] = useState(false);
   const toast = useFlashToast();
 
   const [editedCompany, setEditedCompany] = useState<CompanyFormData>({
@@ -68,8 +75,16 @@ const CompanyManagement = () => {
   const borderColor = useThemeColor({}, "border");
   const mutedTextColor = useThemeColor({}, "mutedText");
 
-  const { getCompanyById, createCompany, updateCompany, updateCompanyLogo } =
-    useCompanies();
+  const {
+    getCompanyById,
+    createCompany,
+    updateCompany,
+    updateCompanyLogo,
+    deleteCompany,
+    companies,
+    companyLimit,
+    hasReachedCompanyLimit,
+  } = useCompanies();
 
   // Create styles with theme colors
   const styles = createStyles({
@@ -79,6 +94,14 @@ const CompanyManagement = () => {
     borderColor,
     mutedTextColor,
   });
+  const shouldDeferBusinessSetupDecision =
+    !id &&
+    upgradeToBusiness === "true" &&
+    (authLoading || profileLoading || !profile);
+  const isBusinessSetupFlow =
+    !id &&
+    upgradeToBusiness === "true" &&
+    profile?.user_type !== UserType.Business;
 
   // Load company if `id` exists, otherwise prefill from route
   useEffect(() => {
@@ -124,6 +147,27 @@ const CompanyManagement = () => {
 
   const handleSave = async () => {
     if (!user) return;
+    if (isBusinessSetupFlow && !businessToggleEnabled) {
+      toast.show({
+        type: "info",
+        title: "Confirm business setup",
+        message:
+          "Turn on the business account switch before completing the company form.",
+      });
+      return;
+    }
+    if (!id && hasReachedCompanyLimit) {
+      const limitMessage = `This account can create up to ${companyLimit} company ${
+        companyLimit === 1 ? "profile" : "profiles"
+      }.`;
+      setError(limitMessage);
+      toast.show({
+        type: "info",
+        title: "Company limit reached",
+        message: limitMessage,
+      });
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -223,7 +267,7 @@ const CompanyManagement = () => {
       });
 
       if (upgradeToBusiness === "true") {
-        router.replace("/profile/edit-profile?businessUpgraded=true");
+        router.replace("/profile/companies");
       } else {
         router.back();
       }
@@ -288,6 +332,37 @@ const CompanyManagement = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!id) {
+      return;
+    }
+
+    setLoading(true);
+    setShowDeletePrompt(false);
+
+    try {
+      const result = await deleteCompany(id);
+      if ((result as any).error) {
+        throw new Error((result as any).error);
+      }
+
+      toast.show({
+        type: "success",
+        title: "Company deleted",
+        message: "The company profile has been removed.",
+      });
+      router.replace("/profile/companies");
+    } catch (e: any) {
+      toast.show({
+        type: "danger",
+        title: "Delete failed",
+        message: e.message || "Failed to delete company",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <ScreenContainer>
@@ -307,131 +382,223 @@ const CompanyManagement = () => {
     );
   }
 
+  if (shouldDeferBusinessSetupDecision) {
+    return (
+      <ScreenContainer>
+        <StatusBar barStyle="dark-content" />
+        <UniversalHeader
+          title={id ? "Edit Company" : "Create Company"}
+          showBackButton={true}
+          showNotifications={false}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={tintColor} />
+          <ThemedText style={styles.loadingText}>
+            Preparing company setup...
+          </ThemedText>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer>
+      <ActionPromptModal
+        visible={showDeletePrompt}
+        title="Delete company?"
+        message="This will permanently remove the company profile from your account."
+        cancelLabel="Cancel"
+        confirmLabel="Delete"
+        onCancel={() => setShowDeletePrompt(false)}
+        onConfirm={handleDelete}
+      />
       <StatusBar barStyle="dark-content" />
 
       <UniversalHeader
         title={id ? "Edit Company" : "Create Company"}
         showBackButton={true}
         showNotifications={false}
-        rightAction={{
-          text: id ? "Update" : "Save",
-          onPress: handleSave,
-        }}
+        rightAction={
+          isBusinessSetupFlow && !businessToggleEnabled
+            ? undefined
+            : {
+                text: id ? "Update" : "Save",
+                onPress: handleSave,
+              }
+        }
       />
 
-      {/* Logo picker */}
-      <Pressable onPress={pickLogo} style={styles.logoPicker}>
-        <ThemedAvatar
-          image={
-            selectedLogoUri ||
-            company?.logo_url ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              editedCompany.name || "Company"
-            )}&size=80`
-          }
-          size={80}
-        >
-          <View style={[styles.logoOverlay, { backgroundColor: tintColor }]}>
-            <Feather name="camera" size={16} color={backgroundColor} />
+      {isBusinessSetupFlow ? (
+        <View style={styles.businessSetupCard}>
+          <View style={styles.businessSetupHeader}>
+            <View style={styles.businessSetupText}>
+              <ThemedText style={styles.businessSetupTitle}>
+                Switch to Business Account
+              </ThemedText>
+              <ThemedText
+                style={[styles.businessSetupSubtitle, { color: mutedTextColor }]}
+              >
+                Turn this on to confirm that you want to create a business
+                account, then fill in your company details below.
+              </ThemedText>
+            </View>
+            <Switch
+              value={businessToggleEnabled}
+              onValueChange={setBusinessToggleEnabled}
+              trackColor={{ false: borderColor, true: tintColor }}
+              thumbColor={businessToggleEnabled ? backgroundColor : "#ffffff"}
+              ios_backgroundColor={borderColor}
+            />
           </View>
-        </ThemedAvatar>
-      </Pressable>
+        </View>
+      ) : null}
 
-      {/* Editable fields */}
-      <SettingsList
-        sections={[
-          {
-            title: "Basic Information",
-            data: [
+      {!isBusinessSetupFlow || businessToggleEnabled ? (
+        <>
+          {/* Logo picker */}
+          <Pressable onPress={pickLogo} style={styles.logoPicker}>
+            <ThemedAvatar
+              image={
+                selectedLogoUri ||
+                company?.logo_url ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  editedCompany.name || "Company"
+                )}&size=80`
+              }
+              size={80}
+            >
+              <View style={[styles.logoOverlay, { backgroundColor: tintColor }]}>
+                <Feather name="camera" size={16} color={backgroundColor} />
+              </View>
+            </ThemedAvatar>
+          </Pressable>
+
+          {/* Editable fields */}
+          {!id ? (
+            <View style={styles.limitInfoContainer}>
+              <ThemedText style={styles.limitInfoText}>
+                {hasReachedCompanyLimit
+                  ? `You have reached this account's company limit of ${companyLimit}.`
+                  : `${Math.max(companyLimit - companies.length, 0)} of ${companyLimit} company slots remaining.`}
+              </ThemedText>
+            </View>
+          ) : null}
+          <SettingsList
+            sections={[
               {
-                title: "Company Name",
-                subtitle: editedCompany.name || "Not set",
-                icon: "home",
-                showTextInput: true,
-                textInputValue: editedCompany.name,
-                textInputPlaceholder: "Enter company name",
-                onTextInputChange: (text: string) =>
-                  setEditedCompany((p) => ({ ...p, name: text })),
+                title: "Basic Information",
+                data: [
+                  {
+                    title: "Company Name",
+                    subtitle: editedCompany.name || "Not set",
+                    icon: "home",
+                    showTextInput: true,
+                    textInputValue: editedCompany.name,
+                    textInputPlaceholder: "Enter company name",
+                    onTextInputChange: (text: string) =>
+                      setEditedCompany((p) => ({ ...p, name: text })),
+                  },
+                  {
+                    title: "Description",
+                    subtitle: editedCompany.description || "No description",
+                    icon: "file-text",
+                    showTextInput: true,
+                    textInputValue: editedCompany.description,
+                    textInputPlaceholder: "Describe your company...",
+                    onTextInputChange: (text: string) =>
+                      setEditedCompany((p) => ({ ...p, description: text })),
+                    textInputProps: { multiline: true, numberOfLines: 3 },
+                  },
+                  {
+                    title: "Industry",
+                    subtitle: editedCompany.industry || "Not set",
+                    icon: "briefcase",
+                    showTextInput: true,
+                    textInputValue: editedCompany.industry,
+                    textInputPlaceholder: "e.g., Technology, Healthcare",
+                    onTextInputChange: (text: string) =>
+                      setEditedCompany((p) => ({ ...p, industry: text })),
+                  },
+                ],
               },
               {
-                title: "Description",
-                subtitle: editedCompany.description || "No description",
-                icon: "file-text",
-                showTextInput: true,
-                textInputValue: editedCompany.description,
-                textInputPlaceholder: "Describe your company...",
-                onTextInputChange: (text: string) =>
-                  setEditedCompany((p) => ({ ...p, description: text })),
-                textInputProps: { multiline: true, numberOfLines: 3 },
+                title: "Company Details",
+                data: [
+                  {
+                    title: "Website",
+                    subtitle: editedCompany.website || "Not set",
+                    icon: "globe",
+                    showTextInput: true,
+                    textInputValue: editedCompany.website,
+                    textInputPlaceholder: "https://example.com",
+                    onTextInputChange: (text: string) =>
+                      setEditedCompany((p) => ({ ...p, website: text })),
+                  },
+                  {
+                    title: "Company Size",
+                    subtitle: editedCompany.size || "Not set",
+                    icon: "users",
+                    showCustomComponent: true,
+                    customComponent: (
+                      <BadgeSelector
+                        options={COMPANY_SIZES}
+                        selectedValue={editedCompany.size}
+                        onValueChange={(value: string) =>
+                          setEditedCompany((p) => ({ ...p, size: value }))
+                        }
+                        title="Select Company Size"
+                      />
+                    ),
+                  },
+                  {
+                    title: "Founded Year",
+                    subtitle: editedCompany.founded_year || "Not set",
+                    icon: "calendar",
+                    showTextInput: true,
+                    textInputValue: editedCompany.founded_year,
+                    textInputPlaceholder: "e.g., 2020",
+                    onTextInputChange: (text: string) =>
+                      setEditedCompany((p) => ({ ...p, founded_year: text })),
+                    textInputProps: { keyboardType: "numeric" },
+                  },
+                  {
+                    title: "Location",
+                    subtitle: editedCompany.location || "Not set",
+                    icon: "map-pin",
+                    showTextInput: true,
+                    textInputValue: editedCompany.location,
+                    textInputPlaceholder: "City, Country",
+                    onTextInputChange: (text: string) =>
+                      setEditedCompany((p) => ({ ...p, location: text })),
+                  },
+                ],
               },
-              {
-                title: "Industry",
-                subtitle: editedCompany.industry || "Not set",
-                icon: "briefcase",
-                showTextInput: true,
-                textInputValue: editedCompany.industry,
-                textInputPlaceholder: "e.g., Technology, Healthcare",
-                onTextInputChange: (text: string) =>
-                  setEditedCompany((p) => ({ ...p, industry: text })),
-              },
-            ],
-          },
-          {
-            title: "Company Details",
-            data: [
-              {
-                title: "Website",
-                subtitle: editedCompany.website || "Not set",
-                icon: "globe",
-                showTextInput: true,
-                textInputValue: editedCompany.website,
-                textInputPlaceholder: "https://example.com",
-                onTextInputChange: (text: string) =>
-                  setEditedCompany((p) => ({ ...p, website: text })),
-              },
-              {
-                title: "Company Size",
-                subtitle: editedCompany.size || "Not set",
-                icon: "users",
-                showCustomComponent: true,
-                customComponent: (
-                  <BadgeSelector
-                    options={COMPANY_SIZES}
-                    selectedValue={editedCompany.size}
-                    onValueChange={(value: string) =>
-                      setEditedCompany((p) => ({ ...p, size: value }))
-                    }
-                    title="Select Company Size"
-                  />
-                ),
-              },
-              {
-                title: "Founded Year",
-                subtitle: editedCompany.founded_year || "Not set",
-                icon: "calendar",
-                showTextInput: true,
-                textInputValue: editedCompany.founded_year,
-                textInputPlaceholder: "e.g., 2020",
-                onTextInputChange: (text: string) =>
-                  setEditedCompany((p) => ({ ...p, founded_year: text })),
-                textInputProps: { keyboardType: "numeric" },
-              },
-              {
-                title: "Location",
-                subtitle: editedCompany.location || "Not set",
-                icon: "map-pin",
-                showTextInput: true,
-                textInputValue: editedCompany.location,
-                textInputPlaceholder: "City, Country",
-                onTextInputChange: (text: string) =>
-                  setEditedCompany((p) => ({ ...p, location: text })),
-              },
-            ],
-          },
-        ]}
-      />
+              ...(id
+                ? [
+                    {
+                      title: "Danger Zone",
+                      data: [
+                        {
+                          title: "Delete Company",
+                          subtitle: "Remove this company profile permanently",
+                          icon: "trash-2",
+                          destructive: true,
+                          onPress: () => setShowDeletePrompt(true),
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </>
+      ) : (
+        <View style={styles.pendingSetupContainer}>
+          <ThemedText style={[styles.pendingSetupText, { color: mutedTextColor }]}>
+            Turn on the switch above to unlock the company form and finish setting up your business account.
+          </ThemedText>
+        </View>
+      )}
 
       {error && (
         <View style={styles.errorContainer}>
@@ -464,6 +631,34 @@ const createStyles = (themeColors: {
       alignSelf: "center",
       marginVertical: Spacing.xl,
     },
+    businessSetupCard: {
+      marginHorizontal: Spacing.md,
+      marginTop: Spacing.md,
+      marginBottom: Spacing.sm,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.md,
+      backgroundColor: themeColors.backgroundColor,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: themeColors.borderColor,
+    },
+    businessSetupHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Spacing.md,
+    },
+    businessSetupText: {
+      flex: 1,
+    },
+    businessSetupTitle: {
+      color: themeColors.textColor,
+      fontSize: 16,
+      fontWeight: "600",
+      marginBottom: 4,
+    },
+    businessSetupSubtitle: {
+      fontSize: 14,
+      lineHeight: 20,
+    },
     logoOverlay: {
       position: "absolute",
       bottom: 0,
@@ -479,6 +674,27 @@ const createStyles = (themeColors: {
       padding: Spacing.md,
       margin: Spacing.md,
       borderRadius: BorderRadius.md,
+    },
+    limitInfoContainer: {
+      marginHorizontal: Spacing.md,
+      marginBottom: Spacing.sm,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.md,
+      backgroundColor: `${themeColors.tintColor}12`,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: `${themeColors.tintColor}33`,
+    },
+    limitInfoText: {
+      color: themeColors.textColor,
+      textAlign: "center",
+    },
+    pendingSetupContainer: {
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.xl,
+    },
+    pendingSetupText: {
+      textAlign: "center",
+      lineHeight: 20,
     },
     errorText: {
       color: Colors.error,

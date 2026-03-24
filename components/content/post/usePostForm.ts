@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { PostType } from '@/types';
@@ -7,10 +7,11 @@ import { JobFieldsData } from './JobFields';
 import { useAuth } from '@/hooks';
 import { usePostOperations } from '@/hooks/posts/usePostOperations';
 import { Flash } from '@/components/ui/Flash';
+import { Post } from '@/types/posts';
 
-export function usePostForm(onSuccess?: () => void) {
+export function usePostForm(onSuccess?: () => void, initialPost?: Post | null) {
   const { user } = useAuth();
-  const { addPost } = usePostOperations();
+  const { addPost, updatePost } = usePostOperations();
 
   // Form state
   const [title, setTitle] = useState('');
@@ -27,6 +28,7 @@ export function usePostForm(onSuccess?: () => void) {
     industry: '',
     company: '',
     companyId: undefined,
+    companyLogo: undefined,
   });
 
   // Article-specific fields
@@ -35,7 +37,43 @@ export function usePostForm(onSuccess?: () => void) {
     industry: '',
     company: '',
     companyId: undefined,
+    companyLogo: undefined,
   });
+
+  const hydrateFromPost = (post: Post) => {
+    setTitle(post.title || '');
+    setContent(post.content || '');
+    setImageUrl(post.image_url || null);
+    setPostType(post.type);
+
+    if (post.type === PostType.Job) {
+      setJobFields({
+        location: post.criteria?.location || '',
+        salary: post.criteria?.salary || '',
+        jobType: post.criteria?.jobType || '',
+        industry: post.industry || '',
+        company: post.criteria?.company || post.company_name || '',
+        companyId: post.criteria?.companyId || post.criteria?.company_id || undefined,
+        companyLogo: post.criteria?.companyLogo || post.company_logo || undefined,
+      });
+    } else {
+      setArticleFields({
+        source: post.criteria?.source || '',
+        industry: post.industry || '',
+        company: post.criteria?.company || post.company_name || '',
+        companyId: post.criteria?.companyId || post.criteria?.company_id || undefined,
+        companyLogo: post.criteria?.companyLogo || post.company_logo || undefined,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!initialPost) {
+      return;
+    }
+
+    hydrateFromPost(initialPost);
+  }, [initialPost]);
 
   const handleImageSelected = (imageUrl: string | null) => {
     setImageUrl(imageUrl);
@@ -53,12 +91,14 @@ export function usePostForm(onSuccess?: () => void) {
       industry: '',
       company: '',
       companyId: undefined,
+      companyLogo: undefined,
     });
     setArticleFields({
       source: '',
       industry: '',
       company: '',
       companyId: undefined,
+      companyLogo: undefined,
     });
   };
 
@@ -92,14 +132,30 @@ export function usePostForm(onSuccess?: () => void) {
       });
       return;
     }
+    const selectedCompanyId =
+      postType === PostType.Job ? jobFields.companyId : articleFields.companyId;
+    const selectedCompanyName =
+      postType === PostType.Job ? jobFields.company : articleFields.company;
 
-    let criteria = {};
+    if (!selectedCompanyId || !selectedCompanyName.trim()) {
+      Flash.show({
+        type: "danger",
+        message: "Company required",
+        description: "Select the company this post should be published under.",
+      });
+      return;
+    }
+
+    const baseCriteria = initialPost?.criteria || {};
+    let criteria = { ...baseCriteria };
     let industry = null;
 
     if (postType === PostType.Job) {
       criteria = {
+        ...baseCriteria,
         company: jobFields.company,
         companyId: jobFields.companyId, // Use company data from jobFields
+        companyLogo: jobFields.companyLogo,
         location: jobFields.location,
         salary: jobFields.salary,
         jobType: jobFields.jobType,
@@ -107,8 +163,10 @@ export function usePostForm(onSuccess?: () => void) {
       industry = jobFields.industry;
     } else if (postType === PostType.News) {
       criteria = {
+        ...baseCriteria,
         company: articleFields.company,
         companyId: articleFields.companyId, // Use company data from articleFields
+        companyLogo: articleFields.companyLogo,
         source: articleFields.source,
       };
       industry = articleFields.industry;
@@ -116,7 +174,7 @@ export function usePostForm(onSuccess?: () => void) {
 
     setLoading(true);
     try {
-      const { error } = await addPost({
+      const postPayload = {
         user_id: user.id,
         type: postType,
         title: title.trim(),
@@ -125,7 +183,11 @@ export function usePostForm(onSuccess?: () => void) {
         industry: industry,
         is_sponsored: false,
         criteria,
-      });
+      };
+
+      const { error } = initialPost
+        ? await updatePost(initialPost.id, postPayload)
+        : await addPost(postPayload);
 
       if (error) throw error;
 

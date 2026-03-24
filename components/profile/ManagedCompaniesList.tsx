@@ -24,7 +24,13 @@ import {
 export default function ManagedCompaniesList() {
   const router = useRouter();
   const { isBusinessUser } = usePermissions();
-  const { companies, loading, error } = useCompanies();
+  const {
+    companies,
+    loading,
+    error,
+    companyLimit,
+    hasReachedCompanyLimit,
+  } = useCompanies();
   const colorScheme = useColorScheme() ?? "light";
   const borderColor = useThemeColor({}, "border");
   const backgroundColor = useThemeColor({}, "background");
@@ -88,12 +94,17 @@ export default function ManagedCompaniesList() {
               styles.addButton,
               {
                 backgroundColor: pressed ? tintColor + "20" : tintColor + "15",
+                opacity: hasReachedCompanyLimit ? 0.5 : 1,
               },
             ]}
             onPress={() => {
+              if (hasReachedCompanyLimit) {
+                return;
+              }
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push("/profile/CompanyManagement");
             }}
+            disabled={hasReachedCompanyLimit}
           >
             <Feather name="plus" size={16} color={tintColor} />
             <ThemedText style={[styles.addButtonText, { color: tintColor }]}>
@@ -102,6 +113,13 @@ export default function ManagedCompaniesList() {
           </Pressable>
         )}
       </View>
+      {isBusinessUser ? (
+        <ThemedText style={[styles.limitText, { color: mutedTextColor }]}>
+          {hasReachedCompanyLimit
+            ? `This account has reached its company limit of ${companyLimit}.`
+            : `${Math.max(companyLimit - companies.length, 0)} of ${companyLimit} company slots remaining.`}
+        </ThemedText>
+      ) : null}
 
       {companies.length === 0 ? (
         <View
@@ -269,6 +287,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.xl,
     fontWeight: Typography.bold,
+  },
+  limitText: {
+    width: "100%",
+    fontSize: Typography.xs,
+    lineHeight: Typography.lineHeight.normal * Typography.xs,
+    marginTop: -8,
+    paddingHorizontal: Spacing.lg,
   },
   addButton: {
     flexDirection: "row",

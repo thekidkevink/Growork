@@ -1,0 +1,5 @@
+JvmtiExport can_access_local_variables 0
+JvmtiExport can_hotswap_or_post_breakpoint 0
+JvmtiExport can_post_on_exceptions 0
+# 503 ciObject found
+ciMethodData java/util/Collections$SetFromMap contains (Ljava/lang/Object;)Z 2 76700 orig 80 0 0 0 0 0 0 0 0 0 0 0 0 255 127 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 data 17 0x50005 0x1206d 0x0 0x1d992dd4030 0x99c 0x1d9c49146d0 0x92 0x0 0x0 0x0 0x0 0x0 0x0 0x9 0x2 0x0 0xffffffffffffffff oops 2

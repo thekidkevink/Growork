@@ -10,6 +10,7 @@ export interface ArticleFieldsData {
   industry: string;
   company: string;
   companyId?: string;
+  companyLogo?: string;
 }
 
 interface ArticleFieldsProps {
@@ -28,13 +29,18 @@ export default function ArticleFields({ values, onChange, style }: ArticleFields
       ...values,
       company: companyData.company,
       companyId: companyData.companyId,
+      companyLogo: companyData.companyLogo,
     });
   };
 
   return (
     <View style={[styles.container, style]}>
       <CompanySelector
-        values={{ company: values.company, companyId: values.companyId }}
+        values={{
+          company: values.company,
+          companyId: values.companyId,
+          companyLogo: values.companyLogo,
+        }}
         onChange={handleCompanyChange}
       />
       <IndustrySelector
