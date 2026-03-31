@@ -68,20 +68,17 @@ async function createPostRecord(postData: PostMutationInput) {
 }
 
 async function deletePostRecord(postId: string) {
-  const { data } = await supabaseRequest<any>(
+  const { data } = await supabaseRequest<boolean>(
     async () => {
-      const { data, error, status } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', postId)
-        .select('*')
-        .single();
+      const { data, error, status } = await supabase.rpc("delete_post_cascade", {
+        post_uuid: postId,
+      });
       return { data, error, status };
     },
-    { logTag: 'posts:delete' }
+    { logTag: "posts:delete:rpc" }
   );
 
-  return data;
+  return { id: postId, deleted: data };
 }
 
 async function updatePostRecord(postId: string, postData: PostMutationInput) {

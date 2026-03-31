@@ -232,3 +232,56 @@ CREATE INDEX IF NOT EXISTS idx_company_follows_profile ON public.company_follows
 CREATE INDEX IF NOT EXISTS idx_company_follows_company ON public.company_follows(company_id);
 CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON public.user_follows(follower_id);
 CREATE INDEX IF NOT EXISTS idx_user_follows_following ON public.user_follows(following_id);
+
+CREATE OR REPLACE FUNCTION public.delete_post_cascade(post_uuid uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  owned_by_user boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.posts
+    WHERE id = post_uuid
+      AND user_id = auth.uid()
+  )
+  INTO owned_by_user;
+
+  IF NOT owned_by_user THEN
+    RAISE EXCEPTION 'You are not allowed to delete this post.';
+  END IF;
+
+  DELETE FROM public.comment_likes
+  WHERE comment_id IN (
+    SELECT id FROM public.comments WHERE post_id = post_uuid
+  );
+
+  DELETE FROM public.ad_impressions
+  WHERE ad_id IN (
+    SELECT id FROM public.ads WHERE post_id = post_uuid
+  );
+
+  DELETE FROM public.applications
+  WHERE post_id = post_uuid;
+
+  DELETE FROM public.bookmarks
+  WHERE post_id = post_uuid;
+
+  DELETE FROM public.likes
+  WHERE post_id = post_uuid;
+
+  DELETE FROM public.comments
+  WHERE post_id = post_uuid;
+
+  DELETE FROM public.ads
+  WHERE post_id = post_uuid;
+
+  DELETE FROM public.posts
+  WHERE id = post_uuid
+    AND user_id = auth.uid();
+
+  RETURN true;
+END;
+$$;
