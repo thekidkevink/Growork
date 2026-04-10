@@ -118,7 +118,7 @@ export default function ForgotPasswordScreen() {
         <ThemedText
           style={[styles.primaryButtonText, { color: color.background }]}
         >
-          {submitting ? "Sending..." : "Send poop reset link"}
+          {submitting ? "Sending..." : "Send reset link"}
         </ThemedText>
       </Pressable>
     </AuthScreenShell>
