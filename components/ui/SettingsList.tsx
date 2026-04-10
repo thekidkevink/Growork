@@ -1,12 +1,15 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import {
+  NativeSyntheticEvent,
+  Platform,
+  SectionList,
   View,
   StyleSheet,
   TouchableOpacity,
   Switch,
-  SectionList,
   Text,
   TextInput,
+  TextInputFocusEventData,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
@@ -31,6 +34,9 @@ interface SettingsItemProps {
   textInputPlaceholder?: string;
   onTextInputChange?: (text: string) => void;
   textInputProps?: any; // Additional TextInput props
+  onTextInputFocus?: (
+    event: NativeSyntheticEvent<TextInputFocusEventData>,
+  ) => void;
   // Custom component props
   showCustomComponent?: boolean;
   customComponent?: React.ReactNode;
@@ -65,6 +71,7 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
   textInputPlaceholder,
   onTextInputChange,
   textInputProps = {},
+  onTextInputFocus,
   // Custom component props
   showCustomComponent = false,
   customComponent,
@@ -76,6 +83,8 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
   const cardBg = useThemeColor({}, "backgroundSecondary");
   const tintColor = useThemeColor({}, "tint");
   const accentContrast = useThemeColor({}, "accentContrast");
+  const { onFocus: textInputPropsOnFocus, ...resolvedTextInputProps } =
+    textInputProps;
 
   return (
     <View
@@ -150,7 +159,11 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
             placeholder={textInputPlaceholder}
             placeholderTextColor={mutedTextColor}
             onChangeText={onTextInputChange}
-            {...textInputProps}
+            onFocus={(event) => {
+              textInputPropsOnFocus?.(event);
+              onTextInputFocus?.(event);
+            }}
+            {...resolvedTextInputProps}
           />
         </View>
       )}
@@ -178,6 +191,24 @@ export default function SettingsList({
   const borderColor = useThemeColor({}, "border");
   const backgroundColor = useThemeColor({}, "background");
   const mutedTextColor = useThemeColor({}, "mutedText");
+  const listRef = useRef<SectionList<SettingsItemProps>>(null);
+
+  const scrollToFocusedItem = useCallback(
+    (sectionIndex: number, itemIndex: number) => {
+      const delay = Platform.OS === "android" ? 260 : 80;
+
+      setTimeout(() => {
+        listRef.current?.scrollToLocation({
+          sectionIndex,
+          itemIndex,
+          animated: true,
+          viewOffset: 0,
+          viewPosition: 0.02,
+        });
+      }, delay);
+    },
+    [],
+  );
 
   const renderSectionHeader = ({ section }: { section: SettingsSection }) => (
     <View style={styles.sectionHeader}>
@@ -198,6 +229,19 @@ export default function SettingsList({
   }) => {
     const isFirst = index === 0;
     const isLast = index === section.data.length - 1;
+    const sectionIndex = sections.indexOf(section);
+    const resolvedItem =
+      item.showTextInput && sectionIndex >= 0
+        ? {
+            ...item,
+            onTextInputFocus: (
+              event: NativeSyntheticEvent<TextInputFocusEventData>,
+            ) => {
+              item.onTextInputFocus?.(event);
+              scrollToFocusedItem(sectionIndex, index);
+            },
+          }
+        : item;
 
     return (
       <View
@@ -208,7 +252,7 @@ export default function SettingsList({
           !isFirst && !isLast && styles.middleItem,
         ]}
       >
-        <SettingsItem {...item} />
+        <SettingsItem {...resolvedItem} />
         {!isLast && (
           <View style={[styles.separator, { backgroundColor: borderColor }]} />
         )}
@@ -218,6 +262,7 @@ export default function SettingsList({
 
   return (
     <SectionList
+      ref={listRef}
       sections={sections}
       keyExtractor={(item, index) => item.title + index}
       renderItem={renderItem}
@@ -226,6 +271,9 @@ export default function SettingsList({
       contentContainerStyle={[styles.contentContainer, contentContainerStyle]}
       showsVerticalScrollIndicator={false}
       stickySectionHeadersEnabled={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      automaticallyAdjustKeyboardInsets
       SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
     />
   );
@@ -236,7 +284,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: 20,
+    paddingBottom: 36,
   },
   sectionHeader: {
     paddingVertical: 8,

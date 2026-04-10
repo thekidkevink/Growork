@@ -38,6 +38,9 @@ export function useNotifications(config: NotificationConfig = {}) {
   // Use refs to avoid circular dependencies
   const fetchNotificationsRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const notificationsRef = useRef(notifications);
+  const channelKeyRef = useRef(
+    `notifications:${Math.random().toString(36).slice(2, 10)}`
+  );
 
   // Update refs when values change
   useEffect(() => {
@@ -161,8 +164,9 @@ export function useNotifications(config: NotificationConfig = {}) {
   useEffect(() => {
     if (!config.realtime || !user) return;
 
+    const channelName = `${channelKeyRef.current}:${user.id}:${config.type || 'all'}`;
     const channel = supabase
-      .channel('notifications')
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -190,9 +194,9 @@ export function useNotifications(config: NotificationConfig = {}) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [user, config.realtime]);
+  }, [user, config.realtime, config.type]);
 
   // Auto-fetch notifications
   useEffect(() => {

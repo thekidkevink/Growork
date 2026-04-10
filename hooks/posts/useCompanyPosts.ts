@@ -11,37 +11,11 @@ export function useCompanyPosts(companyId: string) {
                 return [];
             }
 
-            // First, get the company to find the user_id (company owner)
-            const { data: companyData } = await supabaseRequest<any>(
-                async () => {
-                    const { data, error, status } = await supabase
-                        .from('companies')
-                        .select('user_id')
-                        .eq('id', companyId)
-                        .single();
-                    return { data, error, status };
-                },
-                { logTag: 'companies:getOwner' }
-            );
-
-            if (!companyData) {
-                console.error('Company not found');
-                return [];
-            }
-
-            const companyUserId = companyData.user_id;
-
-            // Fetch posts that belong to this company:
-            // 1. Job posts where criteria->companyId matches the company ID
-            // 2. News posts created by the company owner (user_id)
+            // Fetch only posts that explicitly belong to this company.
+            // This prevents sibling companies under the same owner from
+            // leaking into the selected company's public feed.
             const { data: postsData } = await supabaseRequest<any[]>(
                 async () => {
-                    const orFilters = [
-                        `criteria->>companyId.eq.${companyId}`,
-                        `criteria->>company_id.eq.${companyId}`,
-                        `user_id.eq.${companyUserId}`,
-                    ];
-
                     const { data, error, status } = await supabase
                         .from('posts')
                         .select(`
@@ -49,7 +23,7 @@ export function useCompanyPosts(companyId: string) {
                             likes(id, user_id),
                             comments(id, user_id, content, created_at)
                         `)
-                        .or(orFilters.join(','))
+                        .or(`criteria->>companyId.eq.${companyId},criteria->>company_id.eq.${companyId}`)
                         .order('created_at', { ascending: false });
                     return { data, error, status };
                 },

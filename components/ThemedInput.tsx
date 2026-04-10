@@ -1,14 +1,16 @@
 import { useThemeColor } from "@/hooks";
+import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { StyleSheet, TextInput, type TextInputProps } from "react-native";
 import { forwardRef } from "react";
 
 export type ThemedInputProps = TextInputProps & {
   lightColor?: string;
   darkColor?: string;
+  useBottomSheetInput?: boolean;
 };
 
 export const ThemedInput = forwardRef<TextInput, ThemedInputProps>(
-  ({ style, lightColor, darkColor, ...rest }, ref) => {
+  ({ style, lightColor, darkColor, useBottomSheetInput = false, ...rest }, ref) => {
     const backgroundColor = useThemeColor(
       { light: "#ffffff", dark: "#2a2a2a" },
       "background"
@@ -19,9 +21,10 @@ export const ThemedInput = forwardRef<TextInput, ThemedInputProps>(
     );
     const borderColor = useThemeColor({}, "border");
     const placeholderColor = useThemeColor({}, "mutedText");
+    const InputComponent = useBottomSheetInput ? BottomSheetTextInput : TextInput;
 
     return (
-      <TextInput
+      <InputComponent
         ref={ref}
         style={[
           styles.input,

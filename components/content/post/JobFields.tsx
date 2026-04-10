@@ -110,6 +110,7 @@ export default function JobFields({ values, onChange, style }: JobFieldsProps) {
         placeholder="Location (e.g., Remote, New York, NY)"
         value={values.location}
         onChangeText={(v) => handleChange('location', v)}
+        useBottomSheetInput
       />
       <SalarySelector
         selectedSalary={values.salary}

@@ -52,6 +52,7 @@ export default function ArticleFields({ values, onChange, style }: ArticleFields
         placeholder="Source (e.g., website, publication)"
         value={values.source}
         onChangeText={(v) => handleChange('source', v)}
+        useBottomSheetInput
       />
     </View>
   );

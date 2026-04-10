@@ -137,6 +137,8 @@ export function useBookmarks() {
               id,
               created_at,
               status,
+              user_id,
+              applicant_id,
               cover_letter,
               cover_letter_id,
               resume_id,
@@ -149,7 +151,7 @@ export function useBookmarks() {
               cv_document_id_snapshot,
               application_snapshot
             `)
-            .eq('applicant_id', user.id)
+            .or(`user_id.eq.${user.id},applicant_id.eq.${user.id}`)
             .order('created_at', { ascending: false });
           return { data, error, status };
         },

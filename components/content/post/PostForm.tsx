@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Platform,
   View,
   ScrollView,
   Image,
@@ -132,6 +133,7 @@ export default function PostForm({ onSuccess, onCancel, initialPost }: PostFormP
               value={title}
               maxLength={80}
               onChangeText={setTitle}
+              useBottomSheetInput
             />
             <ThemedInput
               placeholder="What would you like to share?"
@@ -140,6 +142,7 @@ export default function PostForm({ onSuccess, onCancel, initialPost }: PostFormP
               multiline
               textAlignVertical="top"
               style={{ minHeight: 80, maxHeight: 120 }}
+              useBottomSheetInput
             />
             <ImagePickerField
               selectedImage={imageUrl}
@@ -358,7 +361,7 @@ export default function PostForm({ onSuccess, onCancel, initialPost }: PostFormP
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={true}
-          keyboardDismissMode="interactive"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         >
           {renderStepContent()}
         </ScrollView>

@@ -99,14 +99,17 @@ export const CompanyPosts: React.FC<CompanyPostsProps> = ({
   // Filter for posts that are either:
   // 1. Job posts (company posts)
   // 2. News posts created by the company
-  const companyPosts =
-    posts?.filter((post) => {
+  const companyPosts = React.useMemo(
+    () =>
+      posts?.filter((post) => {
       // Show job posts (company posts)
       if (post.type === "job") return true;
       // Show news posts created by the company
       if (post.type === "news") return true;
       return false;
-    }) || [];
+      }) || [],
+    [posts]
+  );
 
   React.useEffect(() => {
     const ids = companyPosts.map((p) => p.id as string).filter(Boolean);

@@ -82,12 +82,13 @@ export default function Bookmarks() {
         .filter(Boolean),
     [bookmarkedItems]
   );
+  const allPostIdsKey = useMemo(() => allPostIds.join(","), [allPostIds]);
 
   React.useEffect(() => {
     if (allPostIds.length) {
       initializePosts(allPostIds);
     }
-  }, [allPostIds.join(","), initializePosts]);
+  }, [allPostIds, allPostIdsKey, initializePosts]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
