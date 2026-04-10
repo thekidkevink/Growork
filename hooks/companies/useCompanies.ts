@@ -38,6 +38,10 @@ const sanitizeCompanyPayload = (
   payload: Partial<Company>
 ): Record<string, unknown> => ({
   ...payload,
+  contact_phone:
+    payload.contact_phone && payload.contact_phone.trim()
+      ? payload.contact_phone.trim()
+      : null,
   size: payload.size && payload.size.trim() ? payload.size : null,
   founded_year: payload.founded_year ?? null,
   user_id: userId,
@@ -182,6 +186,10 @@ export const useCompanies = () => {
       try {
         const cleanedUpdates = {
           ...updates,
+          contact_phone:
+            updates.contact_phone && updates.contact_phone.trim()
+              ? updates.contact_phone.trim()
+              : null,
           size: updates.size && updates.size.trim() ? updates.size : null,
         };
 

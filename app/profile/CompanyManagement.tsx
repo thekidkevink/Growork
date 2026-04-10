@@ -63,6 +63,7 @@ const CompanyManagement = () => {
     description: "",
     website: "",
     contact_email: "",
+    contact_phone: "",
     industry: "",
     size: "",
     founded_year: "",
@@ -118,6 +119,7 @@ const CompanyManagement = () => {
             description: dbCompany.description || "",
             website: dbCompany.website || "",
             contact_email: dbCompany.contact_email || "",
+            contact_phone: dbCompany.contact_phone || "",
             industry: dbCompany.industry || "",
             size: dbCompany.size || "",
             founded_year: dbCompany.founded_year?.toString() || "",
@@ -145,7 +147,7 @@ const CompanyManagement = () => {
       }
     };
     init();
-  }, [id, prefillName, prefillIndustry, prefillLocation]);
+  }, [getCompanyById, id, prefillName, prefillIndustry, prefillLocation]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -175,6 +177,7 @@ const CompanyManagement = () => {
     const trimmedDescription = editedCompany.description.trim();
     const trimmedIndustry = editedCompany.industry.trim();
     const trimmedContactEmail = editedCompany.contact_email.trim();
+    const trimmedContactPhone = editedCompany.contact_phone.trim();
     const trimmedLocation = editedCompany.location.trim();
 
     if (
@@ -182,10 +185,11 @@ const CompanyManagement = () => {
       !trimmedDescription ||
       !trimmedIndustry ||
       !trimmedContactEmail ||
+      !trimmedContactPhone ||
       !trimmedLocation
     ) {
       const validationMessage =
-        "Company name, description, industry, contact email, and location are required.";
+        "Company name, description, industry, contact email, contact number, and location are required.";
       setError(validationMessage);
       toast.show({
         type: "info",
@@ -224,6 +228,7 @@ const CompanyManagement = () => {
         description: trimmedDescription,
         industry: trimmedIndustry,
         contact_email: trimmedContactEmail,
+        contact_phone: trimmedContactPhone,
         location: trimmedLocation,
         website: editedCompany.website.trim(),
         size: editedCompany.size.trim(),
@@ -591,6 +596,19 @@ const CompanyManagement = () => {
                     textInputProps: {
                       keyboardType: "email-address",
                       autoCapitalize: "none",
+                    },
+                  },
+                  {
+                    title: "Contact Number *",
+                    subtitle: editedCompany.contact_phone || "Not set",
+                    icon: "phone",
+                    showTextInput: true,
+                    textInputValue: editedCompany.contact_phone,
+                    textInputPlaceholder: "Enter contact number",
+                    onTextInputChange: (text: string) =>
+                      setEditedCompany((p) => ({ ...p, contact_phone: text })),
+                    textInputProps: {
+                      keyboardType: "phone-pad",
                     },
                   },
                   {

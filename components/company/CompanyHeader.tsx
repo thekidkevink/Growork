@@ -60,6 +60,14 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
     });
   };
 
+  const handlePhonePress = () => {
+    if (!company.contact_phone) return;
+
+    Linking.openURL(`tel:${company.contact_phone}`).catch(() => {
+      Alert.alert("Unavailable", "We could not open your phone app right now.");
+    });
+  };
+
   const detailItems: DetailItem[] = [
     company.industry ? { icon: "briefcase", label: company.industry } : null,
     company.location ? { icon: "map-pin", label: company.location } : null,
@@ -192,7 +200,7 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
         </View>
       </ThemedView>
 
-      {(company.website || company.contact_email) && (
+      {(company.website || company.contact_email || company.contact_phone) && (
         <ThemedView
           style={[
             styles.contactCard,
@@ -240,6 +248,28 @@ export const CompanyHeader: React.FC<CompanyHeaderProps> = ({
                     numberOfLines={1}
                   >
                     {company.contact_email}
+                  </ThemedText>
+                </View>
+              </View>
+              <Feather name="external-link" size={14} color={mutedTextColor} />
+            </TouchableOpacity>
+          ) : null}
+          {company.contact_phone ? (
+            <TouchableOpacity
+              style={[styles.contactRow, { borderColor }]}
+              onPress={handlePhonePress}
+            >
+              <View style={styles.contactRowLeft}>
+                <Feather name="phone" size={16} color={tintColor} />
+                <View style={styles.contactTextWrap}>
+                  <ThemedText style={[styles.contactLabel, { color: textColor }]}>
+                    Contact Number
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.contactValue, { color: mutedTextColor }]}
+                    numberOfLines={1}
+                  >
+                    {company.contact_phone}
                   </ThemedText>
                 </View>
               </View>

@@ -8,7 +8,7 @@ import { useThemeColor } from "@/hooks/ui/useThemeColor";
 interface CompanyContactProps {
   website?: string | null;
   email?: string | null;
-  hasPhone: boolean;
+  phone?: string | null;
   onWebsitePress?: () => void;
   onEmailPress?: () => void;
   onPhonePress?: () => void;
@@ -17,14 +17,14 @@ interface CompanyContactProps {
 export const CompanyContact: React.FC<CompanyContactProps> = ({
   website,
   email,
-  hasPhone,
+  phone,
   onWebsitePress,
   onEmailPress,
   onPhonePress,
 }) => {
   const tintColor = useThemeColor({}, "tint");
 
-  if (!website && !email && !hasPhone) {
+  if (!website && !email && !phone) {
     return null;
   }
 
@@ -47,11 +47,11 @@ export const CompanyContact: React.FC<CompanyContactProps> = ({
             </ThemedText>
           </TouchableOpacity>
         )}
-        {hasPhone && (
+        {phone && (
           <TouchableOpacity style={styles.contactLink} onPress={onPhonePress}>
             <Feather name="phone" size={16} color={tintColor} />
             <ThemedText style={[styles.linkText, { color: tintColor }]}>
-              Contact
+              {phone}
             </ThemedText>
           </TouchableOpacity>
         )}
