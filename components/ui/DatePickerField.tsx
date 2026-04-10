@@ -1,6 +1,7 @@
 import React from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import DateTimePicker, {
+  DateTimePickerAndroid,
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 
@@ -65,6 +66,20 @@ export default function DatePickerField({
     onChange(formatDateForValue(normalized));
   };
 
+  const openPicker = () => {
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: currentDate,
+        mode: "date",
+        maximumDate,
+        onChange: handleChange,
+      });
+      return;
+    }
+
+    setShowPicker(true);
+  };
+
   return (
     <View style={styles.container}>
       <Pressable
@@ -72,7 +87,7 @@ export default function DatePickerField({
           styles.button,
           { borderColor, backgroundColor: backgroundSecondary },
         ]}
-        onPress={() => setShowPicker(true)}
+        onPress={openPicker}
       >
         <ThemedText
           style={[styles.value, { color: value ? textColor : mutedTextColor }]}
@@ -85,16 +100,9 @@ export default function DatePickerField({
         <DateTimePicker
           value={currentDate}
           mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "calendar"}
+          display="spinner"
           maximumDate={maximumDate}
           themeVariant={colorScheme}
-          {...(Platform.OS === "android"
-            ? {
-                design: "material" as const,
-                initialInputMode: "default" as const,
-                title: "Select date",
-              }
-            : {})}
           onChange={handleChange}
         />
       ) : null}

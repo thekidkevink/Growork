@@ -33,10 +33,15 @@ export default function ForgotPasswordScreen() {
     setSubmitting(true);
 
     try {
-      const redirectTo = Linking.createURL("/auth/reset-password");
-      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo,
+      const redirectTo = Linking.createURL("auth/reset-password", {
+        scheme: "growork",
       });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        normalizedEmail,
+        {
+          redirectTo,
+        },
+      );
 
       if (error) {
         setInlineError(error.message || "Could not send reset email.");
@@ -44,7 +49,9 @@ export default function ForgotPasswordScreen() {
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setMessage("We sent a reset link to your email. Open it on this device to choose a new password.");
+      setMessage(
+        "We sent a reset link to your email. Open it on this device to choose a new password.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -57,7 +64,9 @@ export default function ForgotPasswordScreen() {
       footer={
         <View style={styles.footerRow}>
           <Pressable onPress={() => router.replace("/auth/login")}>
-            <ThemedText style={[styles.footerLink, { color: color.text }]}>Back to login</ThemedText>
+            <ThemedText style={[styles.footerLink, { color: color.text }]}>
+              Back to login
+            </ThemedText>
           </Pressable>
         </View>
       }
@@ -87,8 +96,14 @@ export default function ForgotPasswordScreen() {
         />
       </View>
 
-      {inlineError ? <ThemedText style={styles.inlineError}>{inlineError}</ThemedText> : null}
-      {message ? <ThemedText style={[styles.message, { color: color.mutedText }]}>{message}</ThemedText> : null}
+      {inlineError ? (
+        <ThemedText style={styles.inlineError}>{inlineError}</ThemedText>
+      ) : null}
+      {message ? (
+        <ThemedText style={[styles.message, { color: color.mutedText }]}>
+          {message}
+        </ThemedText>
+      ) : null}
 
       <Pressable
         style={({ pressed }) => [
@@ -100,8 +115,10 @@ export default function ForgotPasswordScreen() {
         onPress={handleSendReset}
         disabled={disableSubmit}
       >
-        <ThemedText style={[styles.primaryButtonText, { color: color.background }]}>
-          {submitting ? "Sending..." : "Send reset link"}
+        <ThemedText
+          style={[styles.primaryButtonText, { color: color.background }]}
+        >
+          {submitting ? "Sending..." : "Send poop reset link"}
         </ThemedText>
       </Pressable>
     </AuthScreenShell>

@@ -266,7 +266,9 @@ export default function Settings() {
           setShowResetPrompt(false);
           try {
             const { supabase } = await import("@/utils/supabase");
-            const redirectTo = ExpoLinking.createURL("/auth/reset-password");
+            const redirectTo = ExpoLinking.createURL("auth/reset-password", {
+              scheme: "growork",
+            });
             const { error } = await supabase.auth.resetPasswordForEmail(
               user?.email || "",
               {
