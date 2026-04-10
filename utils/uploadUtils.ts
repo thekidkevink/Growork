@@ -75,6 +75,108 @@ const DOCUMENT_CONTENT_TYPES: Record<string, string> = {
   webp: "image/webp",
 };
 
+const toArrayBuffer = (base64: string) => {
+  const buffer = Buffer.from(base64, "base64");
+  return buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength
+  );
+};
+
+const isTransientUploadError = (error: unknown) => {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  return (
+    message.includes("network request failed") ||
+    message.includes("storageunknownerror") ||
+    message.includes("failed to fetch")
+  );
+};
+
+const uploadWithRetry = async (
+  bucket: StorageBucket,
+  filePath: string,
+  body: ArrayBuffer,
+  contentType: string,
+  signal?: AbortSignal
+) => {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { error } = signal
+      ? await uploadToStorageWithSignal({
+          bucket,
+          filePath,
+          body,
+          contentType,
+          signal,
+        })
+      : await supabase.storage.from(bucket).upload(filePath, body, {
+          contentType,
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+    if (!error) {
+      return;
+    }
+
+    lastError = error;
+
+    if (!isTransientUploadError(error) || attempt === 1) {
+      break;
+    }
+  }
+
+  throw lastError;
+};
+
+const uploadToStorageWithSignal = async ({
+  bucket,
+  filePath,
+  body,
+  contentType,
+  signal,
+}: {
+  bucket: StorageBucket;
+  filePath: string;
+  body: ArrayBuffer;
+  contentType: string;
+  signal: AbortSignal;
+}) => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/${bucket}/${filePath}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      apikey: process.env.EXPO_PUBLIC_SUPABASE_KEY!,
+      Authorization: `Bearer ${
+        session?.access_token || process.env.EXPO_PUBLIC_SUPABASE_KEY!
+      }`,
+      "Content-Type": contentType,
+      "x-upsert": "false",
+      "cache-control": "3600",
+    },
+    body,
+    signal,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    return {
+      error: new Error(
+        errorText || `Upload failed with status ${response.status}`
+      ),
+    };
+  }
+
+  return { error: null };
+};
+
 // Upload function with improved typing
 export const uploadImage = async ({
   bucket = STORAGE_BUCKETS.POSTS,
@@ -83,7 +185,7 @@ export const uploadImage = async ({
   fileNamePrefix = "image",
   onProgress,
 }: {
-  bucket: StorageBucket;
+  bucket?: StorageBucket;
   userId: string;
   uri: string;
   fileNamePrefix?: string;
@@ -102,21 +204,10 @@ export const uploadImage = async ({
       encoding: "base64" as const,
     });
 
-    const byteArray = Uint8Array.from(Buffer.from(base64, "base64"));
+    const arrayBuffer = toArrayBuffer(base64);
 
     // Upload to Supabase with better error handling
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, byteArray, {
-        contentType: `image/${fileExt}`,
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-    if (error) {
-      console.error("Supabase upload error:", error);
-      throw new Error(`Upload failed: ${error.message}`);
-    }
+    await uploadWithRetry(bucket, filePath, arrayBuffer, `image/${fileExt}`);
 
     // Return public URL
     const publicUrl = supabase.storage.from(bucket).getPublicUrl(filePath)
@@ -137,13 +228,15 @@ export const uploadDocument = async ({
   fileNamePrefix = "document",
   documentType = "other",
   onProgress,
+  signal,
 }: {
-  bucket: StorageBucket;
+  bucket?: StorageBucket;
   userId: string;
   uri: string;
   fileNamePrefix?: string;
   documentType?: string;
   onProgress?: (progress: number) => void;
+  signal?: AbortSignal;
 }) => {
   try {
     // Validate file
@@ -158,22 +251,16 @@ export const uploadDocument = async ({
       encoding: "base64" as const,
     });
 
-    const byteArray = Uint8Array.from(Buffer.from(base64, "base64"));
+    const arrayBuffer = toArrayBuffer(base64);
 
     // Upload to Supabase with better error handling
-    const { error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, byteArray, {
-        contentType:
-          DOCUMENT_CONTENT_TYPES[fileExt] || `application/octet-stream`,
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-    if (error) {
-      console.error("Supabase upload error:", error);
-      throw new Error(`Upload failed: ${error.message}`);
-    }
+    await uploadWithRetry(
+      bucket,
+      filePath,
+      arrayBuffer,
+      DOCUMENT_CONTENT_TYPES[fileExt] || "application/octet-stream",
+      signal
+    );
 
     // Return upload result
     const result = {
@@ -201,5 +288,30 @@ export const deleteFile = async (bucket: StorageBucket, filePath: string) => {
   } catch (error) {
     console.error("Delete file error:", error);
     throw error;
+  }
+};
+
+export const getStoragePathFromPublicUrl = (
+  bucket: StorageBucket,
+  publicUrl?: string | null
+) => {
+  if (!publicUrl) {
+    return null;
+  }
+
+  const storageSegment = `/storage/v1/object/public/${bucket}/`;
+  const segmentIndex = publicUrl.indexOf(storageSegment);
+
+  if (segmentIndex === -1) {
+    return null;
+  }
+
+  const encodedPath = publicUrl.slice(segmentIndex + storageSegment.length);
+  const normalizedPath = encodedPath.split("?")[0];
+
+  try {
+    return decodeURIComponent(normalizedPath);
+  } catch {
+    return normalizedPath;
   }
 };

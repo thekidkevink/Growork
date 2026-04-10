@@ -143,7 +143,12 @@ export default function DocumentCard({
 
     return (
       <View style={styles.categoryContainer}>
-        <ThemedText style={[styles.categoryText, { color: mutedText }]}>
+        <ThemedText
+          style={[
+            styles.categoryText,
+            { color: mutedText, backgroundColor: borderColor + "18" },
+          ]}
+        >
           {getDocumentTypeDisplay(document.type)}
         </ThemedText>
       </View>
@@ -183,8 +188,8 @@ export default function DocumentCard({
       style={({ pressed }) => [
         cardStyle,
         {
-          borderBottomColor: borderColor,
-          backgroundColor: "transparent",
+          borderColor,
+          backgroundColor: pressed ? borderColor + "10" : "transparent",
         },
       ]}
       onPress={onPress}
@@ -203,7 +208,7 @@ export default function DocumentCard({
       <View style={styles.cardTextWrap}>
         <ThemedText
           style={styles.cardTitle}
-          numberOfLines={variant === "compact" ? 1 : 2}
+          numberOfLines={variant === "detailed" ? 1 : variant === "compact" ? 1 : 2}
         >
           {document.name}
         </ThemedText>
@@ -233,21 +238,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 8,
-    borderBottomWidth: 1,
+    borderWidth: 1,
+    borderRadius: 12,
     gap: 10,
   },
   cardCompact: {
     flexDirection: "row",
     alignItems: "center",
     padding: 6,
-    borderBottomWidth: 1,
+    borderWidth: 1,
+    borderRadius: 10,
     gap: 8,
   },
   cardDetailed: {
-    flexDirection: "column",
-    padding: 8,
-    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 14,
     gap: 10,
+    minHeight: 0,
   },
   iconContainer: {
     width: 44,
@@ -258,17 +268,18 @@ const styles = StyleSheet.create({
   },
   cardTextWrap: {
     flex: 1,
-    gap: 4,
+    gap: 6,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
     lineHeight: 20,
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexWrap: "wrap",
   },
   cardSubtitle: {
     fontSize: 13,
@@ -279,7 +290,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 999,
   },
   categoryContainer: {
     alignSelf: "flex-start",
@@ -287,27 +298,32 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 11,
     fontWeight: "500",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
   metadataContainer: {
-    marginTop: 4,
-    gap: 4,
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    columnGap: 12,
+    rowGap: 4,
   },
   metadataRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
   },
   metadataText: {
     fontSize: 12,
     fontWeight: "400",
   },
   menuButton: {
-    padding: 8,
+    padding: 6,
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
+    alignSelf: "flex-start",
   },
 });

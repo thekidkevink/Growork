@@ -7,6 +7,7 @@ export interface AccountProfile {
   firstName: string | null;
   surname: string | null;
   fullName: string | null;
+  dateOfBirth: string | null;
   avatarUrl: string | null;
   userType: PublicAccountType;
   phone: string | null;

@@ -2,7 +2,14 @@
 CREATE TYPE post_type AS ENUM ('news', 'job');
 CREATE TYPE ad_status AS ENUM ('active', 'paused', 'completed');
 CREATE TYPE application_status AS ENUM ('pending', 'reviewed', 'accepted', 'rejected');
-CREATE TYPE document_type AS ENUM ('cv', 'cover_letter', 'certificate', 'other');
+CREATE TYPE document_type AS ENUM (
+  'cv',
+  'cover_letter',
+  'qualification',
+  'national_id',
+  'drivers_licence',
+  'other'
+);
 CREATE TYPE user_type AS ENUM ('user', 'business');
 CREATE TYPE notification_type AS ENUM ('post_like', 'post_comment', 'post_bookmark', 'comment_like', 'application_status', 'company_status');
 
@@ -167,8 +174,10 @@ CREATE TABLE public.profiles (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   user_type user_type NOT NULL DEFAULT 'user',
+  profile_role text NOT NULL DEFAULT 'user' CHECK (profile_role IN ('user', 'admin')),
   name text NOT NULL DEFAULT ''::text,
   surname text NOT NULL DEFAULT ''::text,
+  date_of_birth date,
   website text,
   phone text,
   location text,
@@ -214,6 +223,227 @@ CREATE TABLE public.company_follows (
   CONSTRAINT company_follows_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE,
   CONSTRAINT company_follows_unique UNIQUE (profile_id, company_id)
 );
+
+CREATE TABLE public.business_account_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  email text,
+  full_name text NOT NULL,
+  phone text,
+  profession text,
+  company_name text,
+  industry text,
+  location text,
+  message text,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  admin_notes text,
+  reviewed_at timestamp with time zone,
+  reviewed_by uuid,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT business_account_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT business_account_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE,
+  CONSTRAINT business_account_requests_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.profiles(id) ON DELETE SET NULL
+);
+
+CREATE POLICY "Users can delete their own pending business requests"
+ON public.business_account_requests
+FOR DELETE
+TO authenticated
+USING (
+  auth.uid() = user_id
+  AND status = 'pending'
+);
+
+CREATE OR REPLACE FUNCTION public.review_business_account_request(
+  p_request_id uuid,
+  p_status text,
+  p_admin_notes text DEFAULT null
+)
+RETURNS public.business_account_requests
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  acting_profile public.profiles;
+  target_request public.business_account_requests;
+  updated_request public.business_account_requests;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required.';
+  END IF;
+
+  IF p_status NOT IN ('approved', 'rejected') THEN
+    RAISE EXCEPTION 'Invalid review status.';
+  END IF;
+
+  SELECT *
+  INTO acting_profile
+  FROM public.profiles
+  WHERE id = auth.uid();
+
+  IF acting_profile.id IS NULL OR acting_profile.profile_role <> 'admin' THEN
+    RAISE EXCEPTION 'Admin access required.';
+  END IF;
+
+  SELECT *
+  INTO target_request
+  FROM public.business_account_requests
+  WHERE id = p_request_id
+  FOR UPDATE;
+
+  IF target_request.id IS NULL THEN
+    RAISE EXCEPTION 'Business request not found.';
+  END IF;
+
+  IF p_status = 'approved' THEN
+    UPDATE public.profiles
+    SET user_type = 'business'
+    WHERE id = target_request.user_id;
+
+    INSERT INTO public.notifications (
+      user_id,
+      title,
+      body,
+      type,
+      data
+    )
+    VALUES (
+      target_request.user_id,
+      'Business Account Approved',
+      'Your business account request has been approved. You can now access business tools.',
+      'company_status',
+      jsonb_build_object(
+        'type', 'business_request_approved',
+        'request_id', target_request.id,
+        'status', 'approved'
+      )
+    );
+  ELSE
+    INSERT INTO public.notifications (
+      user_id,
+      title,
+      body,
+      type,
+      data
+    )
+    VALUES (
+      target_request.user_id,
+      'Business Account Request Rejected',
+      coalesce(
+        'Your business account request was not approved. Reason: ' || nullif(trim(coalesce(p_admin_notes, '')), ''),
+        'Your business account request was not approved.'
+      ),
+      'company_status',
+      jsonb_build_object(
+        'type', 'business_request_rejected',
+        'request_id', target_request.id,
+        'status', 'rejected',
+        'admin_notes', nullif(trim(coalesce(p_admin_notes, '')), '')
+      )
+    );
+  END IF;
+
+  UPDATE public.business_account_requests
+  SET
+    status = p_status,
+    admin_notes = nullif(trim(coalesce(p_admin_notes, '')), ''),
+    reviewed_at = timezone('utc'::text, now()),
+    reviewed_by = auth.uid()
+  WHERE id = p_request_id
+  RETURNING *
+  INTO updated_request;
+
+  RETURN updated_request;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.retract_business_account_approval(
+  p_request_id uuid
+)
+RETURNS public.business_account_requests
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  acting_profile public.profiles;
+  target_request public.business_account_requests;
+  updated_request public.business_account_requests;
+  remaining_approved_count integer;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required.';
+  END IF;
+
+  SELECT *
+  INTO acting_profile
+  FROM public.profiles
+  WHERE id = auth.uid();
+
+  IF acting_profile.id IS NULL OR acting_profile.profile_role <> 'admin' THEN
+    RAISE EXCEPTION 'Admin access required.';
+  END IF;
+
+  SELECT *
+  INTO target_request
+  FROM public.business_account_requests
+  WHERE id = p_request_id
+  FOR UPDATE;
+
+  IF target_request.id IS NULL THEN
+    RAISE EXCEPTION 'Business request not found.';
+  END IF;
+
+  IF target_request.status <> 'approved' THEN
+    RAISE EXCEPTION 'Only approved requests can be retracted.';
+  END IF;
+
+  UPDATE public.business_account_requests
+  SET
+    status = 'pending',
+    admin_notes = null,
+    reviewed_at = null,
+    reviewed_by = null
+  WHERE id = p_request_id
+  RETURNING *
+  INTO updated_request;
+
+  SELECT count(*)
+  INTO remaining_approved_count
+  FROM public.business_account_requests
+  WHERE user_id = target_request.user_id
+    AND status = 'approved';
+
+  IF remaining_approved_count = 0 THEN
+    UPDATE public.profiles
+    SET user_type = 'user'
+    WHERE id = target_request.user_id;
+  END IF;
+
+  INSERT INTO public.notifications (
+    user_id,
+    title,
+    body,
+    type,
+    data
+  )
+  VALUES (
+    target_request.user_id,
+    'Business Access Returned To Review',
+    'Your business access has been moved back to pending review by an admin.',
+    'company_status',
+    jsonb_build_object(
+      'type', 'business_request_retracted',
+      'request_id', target_request.id,
+      'status', 'pending'
+    )
+  );
+
+  RETURN updated_request;
+END;
+$$;
 
 -- Link table: users follow users
 CREATE TABLE public.user_follows (

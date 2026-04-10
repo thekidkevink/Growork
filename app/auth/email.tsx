@@ -7,6 +7,7 @@ import {
   buildSignupFlow,
   signupRoutes,
 } from "@/src/features/auth/services/signupFlow";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -72,6 +73,14 @@ export default function EmailStep() {
     <AuthScreenShell
       title="Create your account"
       subtitle="Start with your email and password. We'll ask for your basic profile details next."
+      headerContent={
+        <Pressable
+          style={[styles.backButton, { borderColor: color.border, backgroundColor: color.background }]}
+          onPress={() => router.replace("/auth")}
+        >
+          <Ionicons name="arrow-back" size={18} color={color.text} />
+        </Pressable>
+      }
       footer={
         <View style={styles.footerRow}>
           <ThemedText style={styles.footerText}>Already have an account?</ThemedText>
@@ -87,7 +96,7 @@ export default function EmailStep() {
       }
     >
       <View style={styles.fieldGroup}>
-        <ThemedText style={styles.label}>Email</ThemedText>
+        <ThemedText style={styles.label}>Email *</ThemedText>
         <TextInput
           style={[
             styles.input,
@@ -111,7 +120,7 @@ export default function EmailStep() {
       </View>
 
       <View style={styles.fieldGroup}>
-        <ThemedText style={styles.label}>Password</ThemedText>
+        <ThemedText style={styles.label}>Password *</ThemedText>
         <View style={styles.passwordRow}>
           <TextInput
             style={[
@@ -172,6 +181,15 @@ export default function EmailStep() {
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    width: 44,
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
   fieldGroup: {
     gap: 8,
   },

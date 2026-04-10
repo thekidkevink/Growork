@@ -16,8 +16,16 @@ let _openGlobalSheet: (props: GlobalSheetProps) => void = () => {
   console.warn("Global sheet not initialized yet");
 };
 
+let _closeGlobalSheet: () => void = () => {
+  console.warn("Global sheet close not initialized yet");
+};
+
 export function setOpenGlobalSheet(fn: typeof _openGlobalSheet) {
   _openGlobalSheet = fn;
+}
+
+export function setCloseGlobalSheet(fn: typeof _closeGlobalSheet) {
+  _closeGlobalSheet = fn;
 }
 
 export function openGlobalSheet(props: GlobalSheetProps) {
@@ -32,4 +40,8 @@ export function openGlobalSheet(props: GlobalSheetProps) {
   }
   
   _openGlobalSheet(props);
+}
+
+export function closeGlobalSheet() {
+  _closeGlobalSheet();
 }

@@ -21,6 +21,23 @@ const withTimeout = async (
   }
 };
 
+const getTimeoutForRequest = (
+  input: RequestInfo | URL | string,
+  init?: RequestInit
+) => {
+  const url = String(input);
+  const method = (init?.method || "GET").toUpperCase();
+  const isStorageUpload =
+    url.includes("/storage/v1/object") &&
+    (method === "POST" || method === "PUT");
+
+  if (isStorageUpload) {
+    return 5 * 60 * 1000;
+  }
+
+  return 60000;
+};
+
 export const supabase = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL!,
   process.env.EXPO_PUBLIC_SUPABASE_KEY!,
@@ -37,7 +54,7 @@ export const supabase = createClient(
         "X-Client-Info": "growork-app",
       },
       fetch: (input: RequestInfo | URL | string, init?: RequestInit) =>
-        withTimeout(input, init, 60000),
+        withTimeout(input, init, getTimeoutForRequest(input, init)),
     },
     db: {
       schema: "public",

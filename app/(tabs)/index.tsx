@@ -33,6 +33,7 @@ import { buildHomeFeedQuery, feedFilters } from "@/src/features/feed/services/ho
 import type { FeedFilter, FeedItemType } from "@/src/features/feed/domain/feed";
 import { BorderRadius, Colors, Spacing, Typography } from "@/constants/DesignSystem";
 import { useRouter } from "expo-router";
+import { subscribeToHomeTabPress } from "@/utils/homeTabPress";
 import ActionPromptModal from "@/components/ui/ActionPromptModal";
 import { useFlashToast } from "@/components/ui/Flash";
 
@@ -58,6 +59,7 @@ export default function Home() {
   const listRef = useRef<any>(null);
   const lastScrollY = useRef(0);
   const isAnimating = useRef(false);
+  const headerHidden = useRef(false);
 
   const selectedIndustryLabel =
     selectedIndustry >= 0 ? INDUSTRIES[selectedIndustry]?.label ?? null : null;
@@ -125,36 +127,41 @@ export default function Home() {
     };
   }, [page.items, selectedFilter]);
 
+  const animateHeader = useCallback((toValue: number, hidden: boolean) => {
+    if (headerHidden.current === hidden && !isAnimating.current) {
+      return;
+    }
+
+    headerAnim.stopAnimation();
+    isAnimating.current = true;
+
+    Animated.timing(headerAnim, {
+      toValue,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      headerHidden.current = hidden;
+      isAnimating.current = false;
+    });
+  }, [headerAnim]);
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const diff = y - lastScrollY.current;
-    if (y < 40) {
+
+    if (y <= 40) {
+      animateHeader(0, false);
       lastScrollY.current = y;
       return;
     }
-    if (diff > 10 && !isAnimating.current) {
-      isAnimating.current = true;
-      Animated.timing(headerAnim, {
-        toValue: -HEADER_HEIGHT,
-        duration: 400,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start(() => {
-        isAnimating.current = false;
-      });
-    } else if (diff < -10 && !isAnimating.current) {
-      isAnimating.current = true;
-      setTimeout(() => {
-        Animated.timing(headerAnim, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start(() => {
-          isAnimating.current = false;
-        });
-      }, 300);
+
+    if (diff > 12 && !headerHidden.current) {
+      animateHeader(-HEADER_HEIGHT, true);
+    } else if (diff < -12 && headerHidden.current) {
+      animateHeader(0, false);
     }
+
     lastScrollY.current = y;
   };
 
@@ -166,11 +173,13 @@ export default function Home() {
     setRefreshing(true);
     try {
       await refresh();
+      await refreshApplicationStatuses();
+      setHasNewPosts(false);
       await new Promise((resolve) => setTimeout(resolve, 500));
     } finally {
       setRefreshing(false);
     }
-  }, [refresh]);
+  }, [refresh, refreshApplicationStatuses]);
 
   const checkForNewPosts = useCallback(() => {
     if (cardPosts.length > lastPostCount && lastPostCount > 0) {
@@ -182,6 +191,15 @@ export default function Home() {
   React.useEffect(() => {
     checkForNewPosts();
   }, [cardPosts.length, checkForNewPosts]);
+
+  React.useEffect(() => {
+    const unsubscribe = subscribeToHomeTabPress(() => {
+      void handleRefresh();
+      listRef.current?.scrollToOffset?.({ offset: 0, animated: true });
+    });
+
+    return unsubscribe;
+  }, [handleRefresh]);
 
   const handleScrollToTop = useCallback(() => {
     setHasNewPosts(false);
@@ -253,39 +271,18 @@ export default function Home() {
         <ActionPromptModal
           visible={showBusinessUpgradePrompt}
           title="Business setup required"
-          message="Create your company first to publish jobs and company posts."
+          message="Request business access first. Once an admin approves it, you can create companies and publish content."
           cancelLabel="Not now"
-          confirmLabel="Set up business"
+          confirmLabel="Request access"
           onCancel={() => setShowBusinessUpgradePrompt(false)}
           onConfirm={() => {
             setShowBusinessUpgradePrompt(false);
-            const params = new URLSearchParams({
-              upgradeToBusiness: "true",
-            });
-
-            const fullName = [profile?.name, profile?.surname]
-              .map((value) => (value || "").trim())
-              .filter(Boolean)
-              .join(" ");
-
-            if (fullName) {
-              params.set("prefillName", fullName);
-            }
-
-            if (profile?.profession?.trim()) {
-              params.set("prefillIndustry", profile.profession.trim());
-            }
-
-            if (profile?.location?.trim()) {
-              params.set("prefillLocation", profile.location.trim());
-            }
-
             toast.show({
               type: "info",
-              title: "Business setup",
-              message: "Finish your company profile to unlock publishing.",
+              title: "Business request",
+              message: "Submit your request so an admin can review your account.",
             });
-            router.push(`/profile/CompanyManagement?${params.toString()}`);
+            router.push("/profile/business-request");
           }}
         />
         <Animated.View
@@ -306,6 +303,7 @@ export default function Home() {
             selectedIndustry={selectedIndustry}
             onIndustryChange={setSelectedIndustry}
             onAddPost={handleShowCreatePost}
+            canAddPost={isBusinessUser}
           />
         </Animated.View>
 
@@ -337,39 +335,18 @@ export default function Home() {
       <ActionPromptModal
         visible={showBusinessUpgradePrompt}
         title="Business setup required"
-        message="Create your company first to publish jobs and company posts."
+        message="Request business access first. Once an admin approves it, you can create companies and publish content."
         cancelLabel="Not now"
-        confirmLabel="Set up business"
+        confirmLabel="Request access"
         onCancel={() => setShowBusinessUpgradePrompt(false)}
         onConfirm={() => {
           setShowBusinessUpgradePrompt(false);
-          const params = new URLSearchParams({
-            upgradeToBusiness: "true",
-          });
-
-          const fullName = [profile?.name, profile?.surname]
-            .map((value) => (value || "").trim())
-            .filter(Boolean)
-            .join(" ");
-
-          if (fullName) {
-            params.set("prefillName", fullName);
-          }
-
-          if (profile?.profession?.trim()) {
-            params.set("prefillIndustry", profile.profession.trim());
-          }
-
-          if (profile?.location?.trim()) {
-            params.set("prefillLocation", profile.location.trim());
-          }
-
           toast.show({
             type: "info",
-            title: "Business setup",
-            message: "Finish your company profile to unlock publishing.",
+            title: "Business request",
+            message: "Submit your request so an admin can review your account.",
           });
-          router.push(`/profile/CompanyManagement?${params.toString()}`);
+          router.push("/profile/business-request");
         }}
       />
       <Animated.View
@@ -390,6 +367,7 @@ export default function Home() {
           selectedIndustry={selectedIndustry}
           onIndustryChange={setSelectedIndustry}
           onAddPost={handleShowCreatePost}
+          canAddPost={isBusinessUser}
         />
       </Animated.View>
 

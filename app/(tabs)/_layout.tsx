@@ -2,6 +2,7 @@ import { HapticTab } from '@/components/HapticTab';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks';
 import { rootTabs } from '@/src/features/app-shell/config/tabs';
+import { emitHomeTabPress } from '@/utils/homeTabPress';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
@@ -34,6 +35,15 @@ export default function TabLayout() {
         <Tabs.Screen
           key={tab.id}
           name={tabNameMap[tab.id]}
+          listeners={
+            tab.id === 'home'
+              ? {
+                  tabPress: () => {
+                    emitHomeTabPress();
+                  },
+                }
+              : undefined
+          }
           options={{
             title: tab.label,
             tabBarAccessibilityLabel: tab.accessibilityLabel,

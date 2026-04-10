@@ -3,7 +3,7 @@ import { AppProvider } from "@/utils/AppContext";
 import { NotificationProvider } from "@/components/NotificationProvider";
 import { Colors } from "@/constants/Colors";
 import { supabase, handleAuthError } from "@/utils/supabase";
-import { setOpenGlobalSheet } from "@/utils/globalSheet";
+import { setOpenGlobalSheet, setCloseGlobalSheet } from "@/utils/globalSheet";
 import { AuthErrorHandler } from "@/components/AuthErrorHandler";
 import { ThemePreferenceProvider } from "@/utils/theme";
 
@@ -73,7 +73,7 @@ function useProtectedRoute() {
       segments.some((segment) => segment === "reset-password");
 
     if (!session?.user && !isAuthRoute && !isRootIndex) {
-      router.replace("/auth/login");
+      router.replace("/auth");
       return;
     }
 
@@ -250,10 +250,21 @@ function AppContent() {
     }
   };
 
+  const closeGlobalSheet = () => {
+    try {
+      sheetRef.current?.dismiss();
+    } catch (error) {
+      console.error("Error closing bottom sheet:", error);
+    } finally {
+      setSheetProps(null);
+    }
+  };
+
   useEffect(() => {
     // Ensure the global sheet is set after component is mounted
     const timer = setTimeout(() => {
       setOpenGlobalSheet(openGlobalSheet);
+      setCloseGlobalSheet(closeGlobalSheet);
     }, 100);
 
     return () => clearTimeout(timer);
@@ -487,7 +498,10 @@ function AppContent() {
                       <SimpleBottomSheet
                         ref={sheetRef}
                         snapPoints={sheetProps.snapPoints}
-                        onDismiss={() => setSheetProps(null)}
+                        onDismiss={() => {
+                          sheetProps.onDismiss?.();
+                          setSheetProps(null);
+                        }}
                         dynamicSnapPoint={sheetProps.dynamicSnapPoint}
                         dynamicOptions={sheetProps.dynamicOptions}
                       >

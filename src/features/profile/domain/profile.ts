@@ -4,6 +4,7 @@ export interface PublicProfile {
   firstName: string | null;
   surname: string | null;
   fullName: string | null;
+  dateOfBirth: string | null;
   avatarUrl: string | null;
   bio: string | null;
   website: string | null;

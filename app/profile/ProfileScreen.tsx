@@ -10,43 +10,30 @@ import {
   Image,
   Linking,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
-import { useAuth, useThemeColor } from "@/hooks";
+import { useAuth, useBusinessRequests, usePermissions, useThemeColor } from "@/hooks";
 import { Profile } from "@/types";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import ScreenContainer from "@/components/ScreenContainer";
+import UniversalHeader from "@/components/ui/UniversalHeader";
 import { checkProfileCompleteness } from "@/hooks/auth";
-import { supabase } from "@/utils/supabase";
 import { useFlashToast } from "@/components/ui/Flash";
-
-interface ProfileStats {
-  posts: number;
-  followers: number;
-  following: number;
-  applications: number;
-  bookmarks: number;
-}
+import { supabase } from "@/utils/supabase";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
+  const { isAdmin } = usePermissions();
+  const { myLatestRequest, fetchMyLatestRequest } = useBusinessRequests();
   const colorScheme = useColorScheme();
   const textColor = useThemeColor({}, "text");
   const backgroundColor = useThemeColor({}, "background");
   const borderColor = useThemeColor({}, "border");
   const mutedTextColor = useThemeColor({}, "mutedText");
   const tintColor = useThemeColor({}, "tint");
-  const [stats, setStats] = useState<ProfileStats>({
-    posts: 0,
-    followers: 0,
-    following: 0,
-    applications: 0,
-    bookmarks: 0,
-  });
-  const [loading, setLoading] = useState(true);
   const toast = useFlashToast();
 
   const displayName = [profile?.name, profile?.surname]
@@ -54,13 +41,6 @@ export default function ProfileScreen() {
     .join(" ")
     .trim();
   const avatarName = displayName || profile?.username || "User";
-
-  useEffect(() => {
-    if (user) {
-      fetchProfileStats();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
 
   useEffect(() => {
     if (!profile) return;
@@ -80,75 +60,18 @@ export default function ProfileScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
-  const fetchProfileStats = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-
-      // Fetch posts count
-      const { count: postsCount } = await supabase
-        .from("posts")
-        .select("*", { count: "exact", head: true })
-        .or(`user_id.eq.${user.id},applicant_id.eq.${user.id}`);
-
-      // Fetch applications count
-      const { count: applicationsCount } = await supabase
-        .from("applications")
-        .select("*", { count: "exact", head: true })
-        .or(`user_id.eq.${user.id},applicant_id.eq.${user.id}`);
-
-      // Fetch bookmarks count
-      const { count: bookmarksCount } = await supabase
-        .from("bookmarks")
-        .select("*", { count: "exact", head: true })
-        .or(`user_id.eq.${user.id},applicant_id.eq.${user.id}`);
-
-      // Fetch following count (companies followed)
-      const { count: followingCount } = await supabase
-        .from("company_follows")
-        .select("*", { count: "exact", head: true })
-        .eq("profile_id", user.id);
-
-      setStats({
-        posts: postsCount || 0,
-        followers: 0, // Placeholder - would need followers table
-        following: followingCount || 0,
-        applications: applicationsCount || 0,
-        bookmarks: bookmarksCount || 0,
-      });
-    } catch (_error: any) {
-    } finally {
-      setLoading(false);
-    }
-  };
+  useFocusEffect(
+    React.useCallback(() => {
+      void fetchMyLatestRequest();
+    }, [fetchMyLatestRequest])
+  );
 
   const handleEditProfile = () => {
     router.push("/profile/edit-profile");
   };
 
-  const handleSettings = () => {
-    router.push("/settings");
-  };
-
-  const handleViewPosts = () => {
-    if (profile?.user_type === "business") {
-      router.push("/(tabs)/profile");
-      return;
-    }
-
-    Alert.alert(
-      "Posts live in the feed",
-      "Your published activity appears in the main feed. Switch to a business-style profile if you want a dedicated My Posts workspace."
-    );
-  };
-
-  const handleViewApplications = () => {
-    router.push("/(tabs)/applications");
-  };
-
-  const handleViewBookmarks = () => {
-    router.push("/(tabs)/bookmarks");
+  const handleSwitchToBusiness = () => {
+    router.push("/profile/business-request");
   };
 
   const handleOpenWebsite = async () => {
@@ -175,6 +98,14 @@ export default function ProfileScreen() {
     }
   };
 
+  const formattedDateOfBirth = profile?.date_of_birth
+    ? new Date(`${profile.date_of_birth}T00:00:00`).toLocaleDateString()
+    : null;
+  const businessRequestStatusLabel = myLatestRequest?.status
+    ? myLatestRequest.status.charAt(0).toUpperCase() +
+      myLatestRequest.status.slice(1)
+    : null;
+
   if (!profile) {
     return (
       <ScreenContainer>
@@ -196,20 +127,12 @@ export default function ProfileScreen() {
         barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
       />
 
-      {/* Header */}
-      <ThemedView style={[styles.header, { borderBottomColor: borderColor }]}>
-        <View style={styles.headerLeft}>
-          <ThemedText style={styles.headerTitle}>Profile</ThemedText>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleSettings}
-          >
-            <Feather name="settings" size={20} color={textColor} />
-          </TouchableOpacity>
-        </View>
-      </ThemedView>
+      <UniversalHeader
+        title="Profile"
+        titleOffsetY={4}
+        showBackButton
+        showNotifications={false}
+      />
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
@@ -248,7 +171,9 @@ export default function ProfileScreen() {
               <ThemedText
                 style={[styles.userTypeText, { color: mutedTextColor }]}
               >
-                {profile.user_type === "business"
+                {isAdmin
+                  ? "Admin Account"
+                  : profile.user_type === "business"
                   ? "Business Account"
                   : "Personal Account"}
               </ThemedText>
@@ -259,6 +184,13 @@ export default function ProfileScreen() {
                 style={[styles.profileProfession, { color: mutedTextColor }]}
               >
                 {profile.profession}
+              </ThemedText>
+            )}
+            {formattedDateOfBirth && (
+              <ThemedText
+                style={[styles.profileProfession, { color: mutedTextColor }]}
+              >
+                Born {formattedDateOfBirth}
               </ThemedText>
             )}
             {profile.location && (
@@ -296,125 +228,6 @@ export default function ProfileScreen() {
             <ThemedText style={styles.bioText}>{profile.bio}</ThemedText>
           </ThemedView>
         )}
-
-        {/* Stats Section */}
-        <ThemedView style={styles.statsSection}>
-          <View style={styles.statsRow}>
-            <TouchableOpacity style={styles.statItem} onPress={handleViewPosts}>
-              <ThemedText style={styles.statNumber}>{stats.posts}</ThemedText>
-              <ThemedText style={[styles.statLabel, { color: mutedTextColor }]}>
-                Posts
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.statItem}>
-              <ThemedText style={styles.statNumber}>
-                {stats.followers}
-              </ThemedText>
-              <ThemedText style={[styles.statLabel, { color: mutedTextColor }]}>
-                Followers
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.statItem}
-              onPress={() => router.push("/profile/companies")}
-            >
-              <ThemedText style={styles.statNumber}>
-                {stats.following}
-              </ThemedText>
-              <ThemedText style={[styles.statLabel, { color: mutedTextColor }]}>
-                Companies
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-        </ThemedView>
-
-        {/* Quick Actions */}
-        <ThemedView style={styles.quickActionsSection}>
-          <ThemedText style={styles.sectionTitle}>Quick Actions</ThemedText>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity
-              style={[styles.quickActionCard, { borderColor }]}
-              onPress={handleViewApplications}
-            >
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: tintColor + "20" },
-                ]}
-              >
-                <Feather name="briefcase" size={20} color={tintColor} />
-              </View>
-              <ThemedText style={styles.quickActionTitle}>
-                Applications
-              </ThemedText>
-              <ThemedText
-                style={[styles.quickActionSubtitle, { color: mutedTextColor }]}
-              >
-                {stats.applications} applications
-              </ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionCard, { borderColor }]}
-              onPress={handleViewBookmarks}
-            >
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: tintColor + "20" },
-                ]}
-              >
-                <Feather name="bookmark" size={20} color={tintColor} />
-              </View>
-              <ThemedText style={styles.quickActionTitle}>Bookmarks</ThemedText>
-              <ThemedText
-                style={[styles.quickActionSubtitle, { color: mutedTextColor }]}
-              >
-                {stats.bookmarks} saved
-              </ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionCard, { borderColor }]}
-              onPress={() => router.push("/profile/documents")}
-            >
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: tintColor + "20" },
-                ]}
-              >
-                <Feather name="folder" size={20} color={tintColor} />
-              </View>
-              <ThemedText style={styles.quickActionTitle}>Documents</ThemedText>
-              <ThemedText
-                style={[styles.quickActionSubtitle, { color: mutedTextColor }]}
-              >
-                Manage CV & files
-              </ThemedText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionCard, { borderColor }]}
-              onPress={() => router.push("/profile/companies")}
-            >
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: tintColor + "20" },
-                ]}
-              >
-                <Feather name="briefcase" size={20} color={tintColor} />
-              </View>
-              <ThemedText style={styles.quickActionTitle}>Companies</ThemedText>
-              <ThemedText
-                style={[styles.quickActionSubtitle, { color: mutedTextColor }]}
-              >
-                Manage companies
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-        </ThemedView>
 
         {/* Skills Section */}
         {profile.skills && profile.skills.length > 0 && (
@@ -460,6 +273,136 @@ export default function ProfileScreen() {
             )}
           </ThemedView>
         )}
+
+        {profile.user_type !== "business" ? (
+          <ThemedView style={styles.businessSection}>
+            <ThemedText style={styles.sectionTitle}>Business Account</ThemedText>
+            {myLatestRequest?.status === "pending" ? (
+              <TouchableOpacity
+                style={[
+                  styles.requestStatusCard,
+                  { borderColor, backgroundColor: backgroundColor },
+                ]}
+                onPress={handleSwitchToBusiness}
+                activeOpacity={0.85}
+              >
+                <View style={styles.requestStatusHeader}>
+                  <Feather name="clock" size={16} color={tintColor} />
+                  <ThemedText style={styles.requestStatusTitle}>
+                    Request Under Review
+                  </ThemedText>
+                </View>
+                <ThemedText
+                  style={[styles.businessDescription, { color: mutedTextColor }]}
+                >
+                  Your business account request has been submitted and is waiting
+                  for admin review.
+                </ThemedText>
+                <ThemedText
+                  style={[styles.requestStatusMeta, { color: mutedTextColor }]}
+                >
+                  Status: {businessRequestStatusLabel}
+                </ThemedText>
+                <ThemedText
+                  style={[styles.requestStatusMeta, { color: mutedTextColor }]}
+                >
+                  Submitted on{" "}
+                  {new Date(myLatestRequest.created_at).toLocaleDateString()}
+                </ThemedText>
+                <View style={styles.requestStatusFooter}>
+                  <ThemedText
+                    style={[styles.requestStatusLink, { color: tintColor }]}
+                  >
+                    View request details
+                  </ThemedText>
+                  <Feather name="chevron-right" size={16} color={tintColor} />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <ThemedText
+                  style={[styles.businessDescription, { color: mutedTextColor }]}
+                >
+                  {myLatestRequest?.status === "rejected"
+                    ? "Your last request was not approved. You can review the feedback and submit an updated request."
+                    : "Request business access to unlock company tools, publishing, and applicant management."}
+                </ThemedText>
+                {myLatestRequest?.status === "rejected" ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.requestStatusCard,
+                      { borderColor, backgroundColor: backgroundColor },
+                    ]}
+                    onPress={handleSwitchToBusiness}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.requestStatusHeader}>
+                      <Feather name="x-circle" size={16} color="#ef4444" />
+                      <ThemedText style={styles.requestStatusTitle}>
+                        Request Not Approved
+                      </ThemedText>
+                    </View>
+                    <ThemedText
+                      style={[styles.requestStatusMeta, { color: mutedTextColor }]}
+                    >
+                      Status: {businessRequestStatusLabel}
+                    </ThemedText>
+                    {myLatestRequest.admin_notes ? (
+                      <ThemedText
+                        style={[styles.requestStatusMeta, { color: mutedTextColor }]}
+                      >
+                        Reason: {myLatestRequest.admin_notes}
+                      </ThemedText>
+                    ) : null}
+                    <View style={styles.requestStatusFooter}>
+                      <ThemedText
+                        style={[styles.requestStatusLink, { color: tintColor }]}
+                      >
+                        View submitted details
+                      </ThemedText>
+                      <Feather name="chevron-right" size={16} color={tintColor} />
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={[styles.businessButton, { borderColor }]}
+                  onPress={handleSwitchToBusiness}
+                >
+                  <Feather name="briefcase" size={16} color={textColor} />
+                  <ThemedText
+                    style={[styles.editProfileText, { color: textColor }]}
+                  >
+                    {myLatestRequest?.status === "rejected"
+                      ? "Update Business Request"
+                      : "Request Business Account"}
+                  </ThemedText>
+                </TouchableOpacity>
+              </>
+            )}
+          </ThemedView>
+        ) : null}
+
+        {isAdmin ? (
+          <ThemedView style={styles.businessSection}>
+            <ThemedText style={styles.sectionTitle}>Admin</ThemedText>
+            <ThemedText
+              style={[styles.businessDescription, { color: mutedTextColor }]}
+            >
+              Review business account requests and manage launch content from the admin workspace.
+            </ThemedText>
+            <TouchableOpacity
+              style={[styles.businessButton, { borderColor }]}
+              onPress={() => router.push("/admin")}
+            >
+              <Feather name="shield" size={16} color={textColor} />
+              <ThemedText
+                style={[styles.editProfileText, { color: textColor }]}
+              >
+                Open Admin Workspace
+              </ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        ) : null}
       </ScrollView>
     </ScreenContainer>
   );
@@ -575,28 +518,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 0.5,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  headerButton: {
-    padding: 8,
-  },
   profileHeader: {
     paddingHorizontal: 16,
     paddingVertical: 24,
@@ -667,6 +588,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     gap: 6,
+    marginBottom: 10,
+  },
+  businessButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 6,
   },
   editProfileText: {
     fontSize: 14,
@@ -682,63 +613,10 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: "center",
   },
-  statsSection: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  statItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-  },
-  quickActionsSection: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 16,
-  },
-  quickActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  quickActionCard: {
-    width: "48%",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  quickActionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  quickActionTitle: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 4,
-  },
-  quickActionSubtitle: {
-    fontSize: 12,
-    textAlign: "center",
   },
   skillsSection: {
     paddingHorizontal: 16,
@@ -761,6 +639,45 @@ const styles = StyleSheet.create({
   contactSection: {
     paddingHorizontal: 16,
     marginBottom: 24,
+  },
+  businessSection: {
+    paddingHorizontal: 16,
+    marginBottom: 32,
+  },
+  businessDescription: {
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 14,
+  },
+  requestStatusCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    gap: 6,
+  },
+  requestStatusHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  requestStatusTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  requestStatusMeta: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  requestStatusFooter: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  requestStatusLink: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   contactItem: {
     flexDirection: "row",

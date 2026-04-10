@@ -15,7 +15,9 @@ interface DocumentSelectorProps {
 const DOCUMENT_TYPES = [
   { type: DocumentType.CV, label: 'CV/Resume', icon: 'briefcase' },
   { type: DocumentType.CoverLetter, label: 'Cover Letter', icon: 'mail' },
-  { type: DocumentType.Certificate, label: 'Certificate', icon: 'award' },
+  { type: DocumentType.Qualification, label: 'Qualifications', icon: 'award' },
+  { type: DocumentType.NationalId, label: 'National ID', icon: 'credit-card' },
+  { type: DocumentType.DriversLicence, label: "Driver's Licence", icon: 'credit-card' },
   { type: DocumentType.Other, label: 'Other', icon: 'file' },
 ];
 

@@ -13,6 +13,7 @@ import {
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedInput } from "@/components/ThemedInput";
+import DatePickerField from "@/components/ui/DatePickerField";
 import { supabase } from "@/utils/supabase";
 import { UserType, type ProfileFormData } from "@/types";
 import ScreenContainer from "@/components/ScreenContainer";
@@ -34,7 +35,18 @@ const fields: {
 }[] = [
   { label: "Name *", field: "name", placeholder: "First name" },
   { label: "Surname *", field: "surname", placeholder: "Surname" },
-  { label: "Username *", field: "username", placeholder: "Username" },
+  {
+    label: "Date of Birth *",
+    field: "date_of_birth",
+    placeholder: "YYYY-MM-DD",
+  },
+  {
+    label: "Contact Number *",
+    field: "phone",
+    placeholder: "Contact phone",
+    keyboardType: "phone-pad",
+  },
+  { label: "Username", field: "username", placeholder: "Username" },
   {
     label: "Profession *",
     field: "profession",
@@ -48,7 +60,6 @@ const fields: {
     numberOfLines: 4,
   },
   { label: "Website", field: "website", placeholder: "https://..." },
-  { label: "Phone", field: "phone", placeholder: "Contact phone" },
   { label: "Location", field: "location", placeholder: "City, Country" },
   {
     label: "Experience Years",
@@ -72,6 +83,7 @@ export default function UserProfileEdit() {
     name: "",
     surname: "",
     username: "",
+    date_of_birth: "",
     bio: "",
     user_type: UserType.User,
     website: "",
@@ -94,6 +106,7 @@ export default function UserProfileEdit() {
         name: profile.name ?? "",
         surname: profile.surname ?? "",
         username: profile.username ?? "",
+        date_of_birth: profile.date_of_birth ?? "",
         bio: profile.bio ?? "",
         user_type: profile.user_type ?? UserType.User,
         website: profile.website ?? "",
@@ -113,12 +126,13 @@ export default function UserProfileEdit() {
     if (
       !formData.name.trim() ||
       !formData.surname.trim() ||
-      !formData.username.trim() ||
+      !formData.date_of_birth.trim() ||
+      !formData.phone.trim() ||
       !formData.profession.trim()
     ) {
       Alert.alert(
         "Error",
-        "Please fill in all required fields (name, surname, username, profession)."
+        "Please fill in all required fields (name, surname, date of birth, contact number, profession)."
       );
       return;
     }
@@ -227,20 +241,30 @@ export default function UserProfileEdit() {
                 >
                   {f.label}
                 </ThemedText>
-                <ThemedInput
-                  value={formData[f.field]}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, [f.field]: text })
-                  }
-                  placeholder={f.placeholder}
-                  style={[styles.input, f.multiline && styles.textArea]}
-                  placeholderTextColor={mutedTextColor}
-                  multiline={!!f.multiline}
-                  numberOfLines={f.numberOfLines}
-                  editable={editing}
-                  // Only pass keyboardType if it's defined
-                  {...(f.keyboardType && { keyboardType: f.keyboardType })}
-                />
+                {f.field === "date_of_birth" ? (
+                  <DatePickerField
+                    value={formData.date_of_birth}
+                    onChange={(value) =>
+                      setFormData({ ...formData, date_of_birth: value })
+                    }
+                    placeholder={f.placeholder}
+                    maximumDate={new Date()}
+                  />
+                ) : (
+                  <ThemedInput
+                    value={formData[f.field]}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, [f.field]: text })
+                    }
+                    placeholder={f.placeholder}
+                    style={[styles.input, f.multiline && styles.textArea]}
+                    placeholderTextColor={mutedTextColor}
+                    multiline={!!f.multiline}
+                    numberOfLines={f.numberOfLines}
+                    editable={editing}
+                    {...(f.keyboardType && { keyboardType: f.keyboardType })}
+                  />
+                )}
               </View>
             ))}
           </View>

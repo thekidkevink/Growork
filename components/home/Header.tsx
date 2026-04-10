@@ -21,6 +21,7 @@ interface HeaderProps {
   selectedIndustry: number;
   onIndustryChange: (index: number) => void;
   onAddPost: () => void;
+  canAddPost?: boolean;
 }
 
 const Header = ({
@@ -29,6 +30,7 @@ const Header = ({
   selectedIndustry,
   onIndustryChange,
   onAddPost,
+  canAddPost = false,
 }: HeaderProps) => {
   const visibleIndustries = INDUSTRIES;
   const colorScheme = useColorScheme() ?? "light";
@@ -53,13 +55,15 @@ const Header = ({
           resizeMode="contain"
         />
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Pressable
-            style={styles.iconButton}
-            onPress={onAddPost}
-            hitSlop={8}
-          >
-            <Feather name="plus" size={22} color={theme.icon} />
-          </Pressable>
+          {canAddPost ? (
+            <Pressable
+              style={styles.iconButton}
+              onPress={onAddPost}
+              hitSlop={8}
+            >
+              <Feather name="plus" size={22} color={theme.icon} />
+            </Pressable>
+          ) : null}
           <View style={styles.notificationContainer}>
             <Pressable
               style={styles.iconButton}

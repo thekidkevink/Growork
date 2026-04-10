@@ -1,7 +1,7 @@
 import ScreenContainer from "@/components/ScreenContainer";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { useAuth, useCompanies, usePermissions, useThemeColor } from "@/hooks";
+import { useAuth, usePermissions, useThemeColor } from "@/hooks";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -16,8 +16,7 @@ import {
 export default function ProfileTab() {
   const router = useRouter();
   const { user, profile, loading, refreshProfile } = useAuth();
-  const { companies } = useCompanies();
-  const { isBusinessUser } = usePermissions();
+  const { isAdmin, isBusinessUser } = usePermissions();
   const textColor = useThemeColor({}, "text");
   const mutedTextColor = useThemeColor({}, "mutedText");
   const borderColor = useThemeColor({}, "border");
@@ -31,8 +30,6 @@ export default function ProfileTab() {
     .join(" ")
     .trim();
   const accountLabel = displayName || profile?.username || "Your account";
-  const primaryCompany = companies[0];
-
   const handleRefresh = React.useCallback(async () => {
     setRefreshing(true);
     try {
@@ -45,11 +42,11 @@ export default function ProfileTab() {
   const actions = React.useMemo(
     () => [
       {
-      id: "edit-profile",
-      label: "Edit Profile",
-      subtitle: "Update your details and account settings",
+      id: "view-profile",
+      label: "View Profile",
+      subtitle: "See your profile, stats, and quick actions",
       iconName: "user",
-      onPress: () => router.push("/profile/edit-profile"),
+      onPress: () => router.push("/profile/ProfileScreen"),
     },
     {
       id: "documents",
@@ -57,24 +54,6 @@ export default function ProfileTab() {
       subtitle: "Manage your CV and supporting files",
       iconName: "folder",
       onPress: () => router.push("/profile/documents"),
-    },
-    {
-      id: "business-account",
-      label: isBusinessUser
-        ? primaryCompany
-          ? "Manage Account"
-          : "Finish Business Setup"
-        : "Set Up Business Account",
-      subtitle: isBusinessUser
-        ? primaryCompany
-          ? `Edit ${primaryCompany.name} and manage your business profile`
-          : "Create your company profile to finish business setup"
-        : "Unlock publishing, companies, and incoming applications",
-      iconName: "briefcase",
-      onPress: () =>
-        isBusinessUser && primaryCompany?.id
-          ? router.push(`/profile/CompanyManagement?id=${primaryCompany.id}`)
-          : router.push("/profile/CompanyManagement?upgradeToBusiness=true"),
     },
     {
       id: "companies",
@@ -94,13 +73,17 @@ export default function ProfileTab() {
           },
         ]
       : []),
-    {
-      id: "applications",
-      label: "Applications",
-      subtitle: "Track your recent job applications",
-      iconName: "inbox",
-      onPress: () => router.push("/(tabs)/applications"),
-    },
+    ...(isAdmin
+      ? [
+          {
+            id: "admin",
+            label: "Admin",
+            subtitle: "Review business access requests and seed company content",
+            iconName: "shield",
+            onPress: () => router.push("/admin"),
+          },
+        ]
+      : []),
     {
       id: "bookmarks",
       label: "Bookmarks",
@@ -116,7 +99,7 @@ export default function ProfileTab() {
       onPress: () => router.push("/settings"),
     },
   ],
-    [isBusinessUser, primaryCompany?.id, primaryCompany?.name, router]
+    [isAdmin, isBusinessUser, router]
   );
 
   return (
@@ -156,13 +139,6 @@ export default function ProfileTab() {
       >
         <ThemedView style={styles.header}>
           <ThemedText style={styles.title}>Profile</ThemedText>
-          <ThemedText style={[styles.subtitle, { color: mutedTextColor }]}>
-            {loading
-              ? "Loading your account..."
-              : displayName || profile?.username
-              ? `Signed in as ${displayName || `@${profile?.username}`}`
-              : "Manage your account, documents, and activity."}
-          </ThemedText>
         </ThemedView>
 
         <ThemedView
@@ -182,7 +158,13 @@ export default function ProfileTab() {
               profile?.bio ||
               "Complete your profile, keep your documents up to date, and manage your activity from here."}
           </ThemedText>
-          {isBusinessUser ? (
+          {isAdmin ? (
+            <View style={[styles.badge, { backgroundColor: backgroundTertiary }]}>
+              <ThemedText style={[styles.badgeText, { color: textColor }]}>
+                Admin tools unlocked
+              </ThemedText>
+            </View>
+          ) : isBusinessUser ? (
             <View style={[styles.badge, { backgroundColor: backgroundTertiary }]}>
               <ThemedText style={[styles.badgeText, { color: textColor }]}>
                 Business tools unlocked
@@ -239,10 +221,12 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 6,
+    paddingTop: 6,
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
+    lineHeight: 34,
   },
   subtitle: {
     fontSize: 14,

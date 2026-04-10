@@ -28,9 +28,10 @@ interface AppContextType {
   signUp: (
     email: string,
     password: string,
-    username: string,
     name: string,
-    surname: string
+    surname: string,
+    dateOfBirth: string,
+    phone: string
   ) => Promise<{ error?: any; data?: any }>;
   signOut: () => Promise<any>;
   refreshAuth: () => Promise<void>;
@@ -131,9 +132,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     signUp: async (
       email: string,
       password: string,
-      username: string,
       name: string,
-      surname: string
+      surname: string,
+      dateOfBirth: string,
+      phone: string
     ) => {
       try {
         setAuthError(null);
@@ -142,9 +144,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           password,
           options: {
             data: {
-              username,
               name,
               surname,
+              date_of_birth: dateOfBirth,
+              phone,
             },
           },
         });
@@ -180,9 +183,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (authData?.user?.id) {
           const syncedProfile = await createProfileIfNotExists(authData.user.id, {
-            username,
             name,
             surname,
+            date_of_birth: dateOfBirth,
+            phone,
             user_type: UserType.User,
           });
 

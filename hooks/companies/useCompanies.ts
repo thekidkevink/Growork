@@ -1,13 +1,21 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useAuth } from "../auth/useAuth";
 import { Company } from "@/types/company";
-import { UserType } from "@/types/enums";
+import { ProfileRole, UserType } from "@/types/enums";
 import { supabase } from "@/utils/supabase";
 
 const VALID_COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "500+"];
 const DEFAULT_COMPANY_LIMIT = 2;
+const ADMIN_COMPANY_LIMIT = 10;
 
-const resolveCompanyLimit = (override: number | null | undefined) => {
+const resolveCompanyLimit = (
+  override: number | null | undefined,
+  profileRole?: ProfileRole | null
+) => {
+  if (profileRole === ProfileRole.Admin) {
+    return ADMIN_COMPANY_LIMIT;
+  }
+
   if (typeof override === "number" && Number.isFinite(override) && override >= 0) {
     return override;
   }
@@ -26,6 +34,7 @@ const normalizeCompanyArray = (companies: any[] | null | undefined): Company[] =
 
 const sanitizeCompanyPayload = (
   userId: string,
+  isAdmin: boolean,
   payload: Partial<Company>
 ): Record<string, unknown> => ({
   ...payload,
@@ -33,7 +42,7 @@ const sanitizeCompanyPayload = (
   founded_year: payload.founded_year ?? null,
   user_id: userId,
   owner_id: userId,
-  status: payload.status ?? "pending",
+  status: payload.status ?? (isAdmin ? "approved" : "pending"),
 });
 
 export const useCompanies = () => {
@@ -42,8 +51,8 @@ export const useCompanies = () => {
   const [error, setError] = useState<string | null>(null);
   const { user, profile, refreshProfile } = useAuth();
   const companyLimit = useMemo(
-    () => resolveCompanyLimit(profile?.company_limit_override),
-    [profile?.company_limit_override]
+    () => resolveCompanyLimit(profile?.company_limit_override, profile?.profile_role),
+    [profile?.company_limit_override, profile?.profile_role]
   );
   const hasCompanyLimitOverride = useMemo(
     () =>
@@ -128,7 +137,11 @@ export const useCompanies = () => {
           };
         }
 
-        const cleanedData = sanitizeCompanyPayload(user.id, companyData);
+        const cleanedData = sanitizeCompanyPayload(
+          user.id,
+          profile?.profile_role === ProfileRole.Admin,
+          companyData
+        );
 
         const { data, error } = await supabase
           .from("companies")
@@ -148,7 +161,7 @@ export const useCompanies = () => {
         return { error: err.message };
       }
     },
-    [companyLimit, fetchOwnedCompanyCount, user]
+    [companyLimit, fetchOwnedCompanyCount, profile?.profile_role, user]
   );
 
   const updateCompany = useCallback(

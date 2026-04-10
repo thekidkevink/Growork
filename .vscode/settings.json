@@ -3,5 +3,18 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**/.gradle/**": true,
+    "**/node_modules/**/.settings/**": true,
+    "**/node_modules/**/bin/**": true
+  },
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.gradle/**",
+    "**/build/**",
+    "**/bin/**"
+  ]
 }

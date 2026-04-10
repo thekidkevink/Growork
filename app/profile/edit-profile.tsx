@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -10,12 +10,12 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
-import { useAuth, useCompanies, useThemeColor } from "@/hooks";
+import { useAuth, useThemeColor } from "@/hooks";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 // import { ThemedInput } from '@/components/ThemedInput';
 import { ThemedAvatar } from "@/components/ui/ThemedAvatar";
-import ActionPromptModal from "@/components/ui/ActionPromptModal";
+import DatePickerField from "@/components/ui/DatePickerField";
 import SettingsList from "@/components/ui/SettingsList";
 import ScreenContainer from "@/components/ScreenContainer";
 import { UserType } from "@/types/enums";
@@ -32,7 +32,6 @@ export default function EditProfileNative() {
   const { businessUpgraded } =
     useLocalSearchParams<{ businessUpgraded?: string }>();
   const { user, profile, refreshProfile } = useAuth();
-  const { companies } = useCompanies();
   const colorScheme = useColorScheme();
   const textColor = useThemeColor({}, "text");
   const backgroundColor = useThemeColor({}, "background");
@@ -43,15 +42,13 @@ export default function EditProfileNative() {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [showBusinessUpgradePrompt, setShowBusinessUpgradePrompt] =
-    useState(false);
   const toast = useFlashToast();
-  const primaryCompany = companies[0];
 
   const [editedProfile, setEditedProfile] = useState<ProfileFormData>({
     name: "",
     surname: "",
     username: "",
+    date_of_birth: "",
     bio: "",
     user_type: UserType.User,
     website: "",
@@ -94,6 +91,23 @@ export default function EditProfileNative() {
             autoCapitalize: "words",
             maxLength: 50,
           },
+        },
+        {
+          title: "Date of Birth *",
+          subtitle: "Enter your date of birth",
+          icon: "calendar",
+          showArrow: false,
+          showCustomComponent: true,
+          customComponent: (
+            <DatePickerField
+              value={editedProfile.date_of_birth}
+              onChange={(value) =>
+                setEditedProfile((prev) => ({ ...prev, date_of_birth: value }))
+              }
+              placeholder="Select your date of birth"
+              maximumDate={new Date()}
+            />
+          ),
         },
         {
           title: "Username",
@@ -207,7 +221,7 @@ export default function EditProfileNative() {
           },
         },
         {
-          title: "Phone",
+          title: "Phone *",
           subtitle: "Enter your phone number",
           icon: "phone",
           showTextInput: true,
@@ -236,39 +250,6 @@ export default function EditProfileNative() {
         },
       ],
     },
-    {
-      title: "Account Settings",
-      data: [
-        {
-          title: "Account Email",
-          subtitle: user?.email || "No email found for this account",
-          icon: "mail",
-        },
-        {
-          title:
-            editedProfile.user_type === UserType.Business
-              ? primaryCompany
-                ? "Manage Account"
-                : "Finish Business Setup"
-              : "Set Up Business Account",
-          subtitle:
-            editedProfile.user_type === UserType.Business
-              ? primaryCompany
-                ? `${primaryCompany.name} is linked to your business account`
-                : "Create your company profile to finish business setup"
-              : "Create a company profile to unlock posting and business tools",
-          icon: "briefcase",
-          onPress: () => {
-            if (editedProfile.user_type === UserType.Business && primaryCompany?.id) {
-              router.push(`/profile/CompanyManagement?id=${primaryCompany.id}`);
-              return;
-            }
-
-            setShowBusinessUpgradePrompt(true);
-          },
-        },
-      ],
-    },
   ];
 
   useEffect(() => {
@@ -277,6 +258,7 @@ export default function EditProfileNative() {
         name: profile.name || "",
         surname: profile.surname || "",
         username: profile.username || "",
+        date_of_birth: profile.date_of_birth || "",
         bio: profile.bio || "",
         user_type: profile.user_type,
         website: profile.website || "",
@@ -319,11 +301,16 @@ export default function EditProfileNative() {
 
   const handleSave = async () => {
     if (!user || !profile || isSaving) return;
-    if (!editedProfile.name?.trim() || !editedProfile.surname?.trim()) {
+    if (
+      !editedProfile.name?.trim() ||
+      !editedProfile.surname?.trim() ||
+      !editedProfile.date_of_birth?.trim() ||
+      !editedProfile.phone?.trim()
+    ) {
       toast.show({
         type: "danger",
         title: "Required fields",
-        message: "First name and last name are required.",
+        message: "First name, last name, date of birth, and contact number are required.",
       });
       return;
     }
@@ -335,6 +322,7 @@ export default function EditProfileNative() {
         name: editedProfile.name.trim(),
         surname: editedProfile.surname.trim(),
         username: editedProfile.username.trim(),
+        date_of_birth: editedProfile.date_of_birth.trim(),
         bio: editedProfile.bio.trim(),
         user_type: profile.user_type,
         website: editedProfile.website.trim(),
@@ -416,38 +404,6 @@ export default function EditProfileNative() {
 
   return (
     <ScreenContainer>
-      <ActionPromptModal
-        visible={showBusinessUpgradePrompt}
-        title="Set up your business account"
-        message="We’ll take you to company setup first. Once you save your company, your account will unlock business tools."
-        cancelLabel="Not now"
-        confirmLabel="Continue"
-        onCancel={() => setShowBusinessUpgradePrompt(false)}
-        onConfirm={() => {
-          setShowBusinessUpgradePrompt(false);
-          const params = new URLSearchParams({
-            upgradeToBusiness: "true",
-          });
-          const fullName = [editedProfile.name, editedProfile.surname]
-            .map((value) => value.trim())
-            .filter(Boolean)
-            .join(" ");
-
-          if (fullName) {
-            params.set("prefillName", fullName);
-          }
-
-          if (editedProfile.profession.trim()) {
-            params.set("prefillIndustry", editedProfile.profession.trim());
-          }
-
-          if (editedProfile.location.trim()) {
-            params.set("prefillLocation", editedProfile.location.trim());
-          }
-
-          router.push(`/profile/CompanyManagement?${params.toString()}`);
-        }}
-      />
       <StatusBar
         barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
       />
@@ -612,3 +568,4 @@ const styles = StyleSheet.create({
     padding: 6,
   },
 });
+

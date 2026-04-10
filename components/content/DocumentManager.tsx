@@ -1,13 +1,13 @@
 import { useAuth, useThemeColor } from "@/hooks";
 import { DocumentType, Document } from "@/types";
 import { supabase } from "@/utils/supabase";
-import { STORAGE_BUCKETS } from "@/utils/uploadUtils";
+import { uploadDocument } from "@/utils/uploadUtils";
+import { closeGlobalSheet } from "@/utils/globalSheet";
 import * as DocumentPicker from "expo-document-picker";
 import { Feather } from "@expo/vector-icons";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   View,
@@ -18,8 +18,6 @@ import { ThemedView } from "../ThemedView";
 import BadgeSelector, { BadgeOption } from "../ui/BadgeSelector";
 import DocumentCard from "./DocumentCard";
 import * as Haptics from "expo-haptics";
-import * as FileSystem from "expo-file-system/legacy";
-import { Buffer } from "buffer";
 
 type DocumentManagerProps = {
   userId?: string;
@@ -33,7 +31,9 @@ type DocumentManagerProps = {
 const DOCUMENT_TYPE_OPTIONS: BadgeOption[] = [
   { label: "CV/Resume", value: DocumentType.CV },
   { label: "Cover Letter", value: DocumentType.CoverLetter },
-  { label: "Certificate", value: DocumentType.Certificate },
+  { label: "Qualifications", value: DocumentType.Qualification },
+  { label: "National ID", value: DocumentType.NationalId },
+  { label: "Driver's Licence", value: DocumentType.DriversLicence },
   { label: "Other", value: DocumentType.Other },
 ];
 
@@ -51,9 +51,17 @@ export default function DocumentManager({
     useState<DocumentType>(documentType || DocumentType.CV);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(
+    null
+  );
+  const [uploadErrorMessage, setUploadErrorMessage] = useState<string | null>(
+    null
+  );
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
     null
   );
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
   const backgroundColor = useThemeColor({}, "background");
   const textColor = useThemeColor({}, "text");
   const borderColor = useThemeColor({}, "border");
@@ -91,6 +99,14 @@ export default function DocumentManager({
     fetchDocuments();
   }, [fetchDocuments]);
 
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      uploadAbortControllerRef.current?.abort();
+      uploadAbortControllerRef.current = null;
+    };
+  }, []);
+
   const handleDocumentSelect = (document: Document) => {
     if (selectable && onSelect) {
       setSelectedDocumentId(document.id);
@@ -98,11 +114,21 @@ export default function DocumentManager({
     }
   };
 
+  const handleClose = () => {
+    if (uploading) {
+      uploadAbortControllerRef.current?.abort();
+      uploadAbortControllerRef.current = null;
+    }
+    closeGlobalSheet();
+  };
+
   const handleUploadDocument = async () => {
-    if (!user) return;
+    if (!user || uploading || uploadSuccessMessage) return;
 
     try {
       setUploading(true);
+      setUploadSuccessMessage(null);
+      setUploadErrorMessage(null);
 
       // Pick document
       const result = await DocumentPicker.getDocumentAsync({
@@ -120,54 +146,15 @@ export default function DocumentManager({
       }
 
       const file = result.assets[0];
+      const abortController = new AbortController();
+      uploadAbortControllerRef.current = abortController;
 
-      // Validate file exists
-      const fileInfo = await FileSystem.getInfoAsync(file.uri);
-      if (!fileInfo.exists) {
-        throw new Error("Document file does not exist");
-      }
-
-      // Check file size (50MB limit)
-      const maxSize = 50 * 1024 * 1024;
-      if (fileInfo.size && fileInfo.size > maxSize) {
-        throw new Error("Document file is too large (max 50MB)");
-      }
-
-      const fileExt = file.name.split(".").pop()?.toLowerCase() || "pdf";
-      const uniqueFileName = `document_${user.id}_${Date.now()}.${fileExt}`;
-      const filePath = `${uniqueFileName}`;
-
-      // Read file as base64
-      const base64 = await FileSystem.readAsStringAsync(file.uri, {
-        encoding: "base64" as const,
+      const uploadedDocument = await uploadDocument({
+        userId: user.id,
+        uri: file.uri,
+        documentType: selectedDocumentType,
+        signal: abortController.signal,
       });
-
-      const byteArray = Uint8Array.from(Buffer.from(base64, "base64"));
-
-      // Upload to Supabase storage
-      const { data, error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKETS.DOCUMENTS)
-        .upload(filePath, byteArray, {
-          contentType:
-            fileExt === "pdf"
-              ? "application/pdf"
-              : fileExt === "doc"
-                ? "application/msword"
-                : fileExt === "docx"
-                  ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  : "application/octet-stream",
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get public URL
-      const publicUrl = supabase.storage
-        .from(STORAGE_BUCKETS.DOCUMENTS)
-        .getPublicUrl(filePath).data.publicUrl;
 
       // Add document record
       const { data: insertedDocument, error: dbError } = await supabase
@@ -176,7 +163,7 @@ export default function DocumentManager({
           user_id: user.id,
           type: selectedDocumentType,
           name: file.name,
-          file_url: publicUrl,
+          file_url: uploadedDocument.url,
         })
         .select("*")
         .single();
@@ -189,23 +176,44 @@ export default function DocumentManager({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
-      Alert.alert("Success", "Document uploaded successfully!");
-
       // Refresh the documents list
       await fetchDocuments();
+      onSuccess?.();
       if (selectable && insertedDocument && onSelect) {
         setSelectedDocumentId(insertedDocument.id);
         onSelect(insertedDocument);
       }
-      onSuccess?.();
+      setUploadSuccessMessage(
+        `"${insertedDocument?.name || file.name}" uploaded successfully.`
+      );
     } catch (error: any) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      if (
+        error?.name === "AbortError" ||
+        error?.message?.includes("Aborted") ||
+        error?.message?.includes("aborted")
+      ) {
+        setUploadErrorMessage(null);
+        return;
+      }
+
       console.error("Error uploading document:", error);
-      Alert.alert("Upload Error", error.message || "Failed to upload document");
+      const message =
+        error?.message?.includes("Network request failed")
+          ? "Upload failed while sending the file. Please check your connection and try again."
+          : error.message || "Failed to upload document";
+      setUploadErrorMessage(message);
       if (process.env.EXPO_OS === "ios") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } finally {
-      setUploading(false);
+      uploadAbortControllerRef.current = null;
+      if (isMountedRef.current) {
+        setUploading(false);
+      }
     }
   };
 
@@ -280,6 +288,13 @@ export default function DocumentManager({
             <ThemedText style={styles.title} type="defaultSemiBold">
               Upload Document
             </ThemedText>
+            <Pressable
+              style={styles.closeButton}
+              onPress={handleClose}
+              hitSlop={8}
+            >
+              <Feather name="x" size={20} color={textColor} />
+            </Pressable>
           </View>
 
           {/* Document Type Selector */}
@@ -298,17 +313,41 @@ export default function DocumentManager({
 
           {/* Upload Button */}
           <View style={styles.uploadContainer}>
+            {uploadSuccessMessage ? (
+              <View style={[styles.feedbackCard, styles.successCard]}>
+                <Feather name="check-circle" size={18} color="#15803d" />
+                <ThemedText style={styles.successText}>
+                  {uploadSuccessMessage}
+                </ThemedText>
+              </View>
+            ) : null}
+            {uploadErrorMessage ? (
+              <View style={[styles.feedbackCard, styles.errorCard]}>
+                <Feather name="alert-circle" size={18} color="#b91c1c" />
+                <ThemedText style={styles.errorText}>
+                  {uploadErrorMessage}
+                </ThemedText>
+              </View>
+            ) : null}
             <Pressable
               style={[
                 styles.uploadButton,
                 { borderColor: tintColor },
-                uploading && styles.uploadButtonDisabled,
+                (uploading || !!uploadSuccessMessage) &&
+                  styles.uploadButtonDisabled,
               ]}
               onPress={handleUploadDocument}
-              disabled={uploading}
+              disabled={uploading || !!uploadSuccessMessage}
             >
               {uploading ? (
                 <ActivityIndicator size="small" color={textColor} />
+              ) : uploadSuccessMessage ? (
+                <>
+                  <Feather name="check" size={20} color={textColor} />
+                  <ThemedText style={styles.uploadButtonText}>
+                    Uploaded
+                  </ThemedText>
+                </>
               ) : (
                 <>
                   <Feather name="upload" size={20} color={textColor} />
@@ -320,7 +359,12 @@ export default function DocumentManager({
             </Pressable>
             {uploading && (
               <ThemedText style={[styles.uploadingText, { color: textColor }]}>
-                Uploading document...
+                Uploading document. Tap X or outside the form to cancel.
+              </ThemedText>
+            )}
+            {uploadSuccessMessage && (
+              <ThemedText style={[styles.uploadingText, { color: textColor }]}>
+                Tap outside the form to close.
               </ThemedText>
             )}
           </View>
@@ -337,11 +381,21 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   title: {
     fontSize: 18,
     fontWeight: "600",
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   selectorContainer: {
     marginBottom: 12,
@@ -349,6 +403,33 @@ const styles = StyleSheet.create({
   uploadContainer: {
     alignItems: "center",
     gap: 12,
+  },
+  feedbackCard: {
+    width: "100%",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  successCard: {
+    backgroundColor: "#dcfce7",
+  },
+  errorCard: {
+    backgroundColor: "#fee2e2",
+  },
+  successText: {
+    flex: 1,
+    color: "#166534",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  errorText: {
+    flex: 1,
+    color: "#991b1b",
+    fontSize: 14,
+    fontWeight: "500",
   },
   uploadButton: {
     flexDirection: "row",

@@ -13,12 +13,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import {
   useAuth,
-  usePosts as useFeedPosts,
   useThemeColor,
   useApplicationStatus,
   useTextToSpeech,
   usePostById,
-  useCompanies,
+  useComments,
+  formatCommentDate,
+  useCustomCommentsBottomSheet,
 } from "@/hooks";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -47,20 +48,12 @@ const PostDetail = () => {
   const { user } = useAuth();
 
   const [post, setPost] = useState<Post | null>(null);
-  const [recommendedCompanies, setRecommendedCompanies] = useState<{
-    [key: string]: any;
-  }>({});
-  const [mainPostCompany, setMainPostCompany] = useState<any>(null);
+  const { comments, loading: commentsLoading } = useComments(id || "");
+  const { openCommentsSheet } = useCustomCommentsBottomSheet();
 
   const borderColor = useThemeColor({}, "border");
   const textColor = useThemeColor({}, "text");
   const mutedTextColor = useThemeColor({}, "mutedText");
-
-  const {
-    posts: allPosts,
-    loading: feedLoading,
-    refresh: fetchPosts,
-  } = useFeedPosts();
   const applicationPostIds = useMemo(() => (id ? [id] : []), [id]);
   const {
     statuses: applicationStatuses,
@@ -71,9 +64,6 @@ const PostDetail = () => {
   const hasApplied = !!application;
   const { speak, stop, isSpeaking, isPaused } = useTextToSpeech();
   const { getPostById, loading: postLoading } = usePostById();
-  const { getCompanyByIdPublic } = useCompanies();
-  const mainPostCompanyId =
-    post?.criteria?.companyId || post?.criteria?.company_id;
 
   // Cleanup text-to-speech when component unmounts
   useEffect(() => {
@@ -87,74 +77,10 @@ const PostDetail = () => {
       if (id) {
         const { data } = await getPostById(id as string);
         setPost(data);
-        fetchPosts();
       }
     };
     fetchData();
-  }, [id, fetchPosts, getPostById]);
-
-  // Fetch company data for main post
-  useEffect(() => {
-    const fetchMainPostCompany = async () => {
-      if (mainPostCompanyId) {
-        try {
-          const { company } = await getCompanyByIdPublic(mainPostCompanyId);
-          setMainPostCompany(company);
-        } catch (error) {
-          console.warn("Failed to fetch company data for main post:", error);
-        }
-      } else {
-        setMainPostCompany(null);
-      }
-    };
-
-    fetchMainPostCompany();
-  }, [mainPostCompanyId, getCompanyByIdPublic]);
-
-  const recommendedPosts = useMemo(() => {
-    if (!post || !allPosts) return [];
-    return allPosts.filter(
-      (p: Post) => p.type === post.type && p.id !== post.id
-    );
-  }, [post, allPosts]);
-
-  // Fetch company data for recommended posts
-  useEffect(() => {
-    const fetchCompanyData = async () => {
-      if (recommendedPosts.length > 0) {
-        const companyPromises = recommendedPosts
-          .filter((post) => post.criteria?.companyId || post.criteria?.company_id)
-          .map(async (post) => {
-            try {
-              const recommendedCompanyId =
-                post.criteria?.companyId || post.criteria?.company_id;
-              if (!recommendedCompanyId) {
-                return { postId: post.id, company: null };
-              }
-              const { company } = await getCompanyByIdPublic(
-                recommendedCompanyId
-              );
-              return { postId: post.id, company };
-            } catch (error) {
-              console.warn("Failed to fetch company data for post:", post.id);
-              return { postId: post.id, company: null };
-            }
-          });
-
-        const results = await Promise.all(companyPromises);
-        const companiesMap = results.reduce((acc, { postId, company }) => {
-          if (company) {
-            acc[postId] = company;
-          }
-          return acc;
-        }, {} as { [key: string]: any });
-
-        setRecommendedCompanies(companiesMap);
-      }
-    };
-
-    fetchCompanyData();
-  }, [recommendedPosts, getCompanyByIdPublic]);
+  }, [id, getPostById]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -222,7 +148,7 @@ const PostDetail = () => {
     ]);
   };
 
-  if (postLoading || feedLoading) {
+  if (postLoading) {
     return (
       <ScreenContainer>
         <UniversalHeader
@@ -274,16 +200,15 @@ const PostDetail = () => {
           <ThemedText style={styles.postTitle}>{post.title}</ThemedText>
 
           {/* Company Info - Minimal */}
-          {isJob && (post.criteria?.company || mainPostCompany?.name) && (
+          {isJob && post.criteria?.company && (
             <RNView style={styles.companyRow}>
               <Image
                 source={{
                   uri:
-                    mainPostCompany?.logo_url ||
                     post.criteria?.companyLogo ||
                     post.company_logo ||
                     `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      post.criteria.company || mainPostCompany?.name || "Company"
+                      post.criteria.company || "Company"
                     )}&size=64`,
                 }}
                 style={styles.companyLogo}
@@ -292,7 +217,7 @@ const PostDetail = () => {
                 <ThemedText
                   style={[styles.companyName, { color: mutedTextColor }]}
                 >
-                  {post.criteria.company || mainPostCompany?.name}
+                  {post.criteria.company}
                 </ThemedText>
                 {post.criteria.location && (
                   <ThemedText
@@ -431,56 +356,55 @@ const PostDetail = () => {
             />
           )}
         </ThemedView>
-
-        {recommendedPosts.length > 0 && (
-          <ThemedView style={styles.similarContainer}>
-            <ThemedText style={styles.similarTitle}>
-              {isJob ? "Similar Jobs" : "Related News"}
-            </ThemedText>
-            <RNView style={styles.recommendedListContainer}>
-              {recommendedPosts.map((item: Post) => {
-                const itemCompanyName =
-                  item.criteria?.company || item.company_name || "Company";
-                const companyData = recommendedCompanies[item.id];
-                const logoUrl =
-                  companyData?.logo_url ||
-                  item.company_logo ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    itemCompanyName
-                  )}&size=128`;
-
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.recommendedItem}
-                    onPress={() => router.push(`/post/${item.id}`)}
-                  >
-                    <Image
-                      source={{ uri: logoUrl }}
-                      style={styles.recommendedLogo}
-                    />
-                    <RNView style={styles.recommendedInfo}>
-                      <ThemedText
-                        style={styles.recommendedTitle}
-                        numberOfLines={2}
-                      >
-                        {item.title}
-                      </ThemedText>
-                      <ThemedText
-                        style={[
-                          styles.recommendedCompany,
-                          { color: mutedTextColor },
-                        ]}
-                      >
-                        {isJob
-                          ? itemCompanyName
-                          : item.criteria?.source || "News Source"}
-                      </ThemedText>
-                    </RNView>
-                  </TouchableOpacity>
-                );
-              })}
+        {!commentsLoading && comments.length > 0 && (
+          <ThemedView
+            style={[styles.commentsContainer, { borderTopColor: borderColor }]}
+          >
+            <RNView style={styles.commentsHeader}>
+              <ThemedText style={styles.commentsTitle}>Comments</ThemedText>
+              <TouchableOpacity
+                onPress={() => openCommentsSheet(post.id, post.user_id)}
+                style={styles.commentsAction}
+              >
+                <ThemedText style={[styles.commentsLink, { color: textColor }]}>
+                  View all
+                </ThemedText>
+                <Feather name="chevron-right" size={16} color={mutedTextColor} />
+              </TouchableOpacity>
             </RNView>
+
+            {comments.slice(0, 3).map((comment) => {
+              const displayName =
+                [comment.profile?.name, comment.profile?.surname]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim() ||
+                comment.profile?.username ||
+                "User";
+
+              return (
+                <TouchableOpacity
+                  key={comment.id}
+                  style={[styles.commentPreviewCard, { borderColor }]}
+                  onPress={() => openCommentsSheet(post.id, post.user_id)}
+                  activeOpacity={0.85}
+                >
+                  <RNView style={styles.commentPreviewHeader}>
+                    <ThemedText style={styles.commentAuthor}>
+                      {displayName}
+                    </ThemedText>
+                    <ThemedText
+                      style={[styles.commentTime, { color: mutedTextColor }]}
+                    >
+                      {formatCommentDate(comment.created_at)}
+                    </ThemedText>
+                  </RNView>
+                  <ThemedText style={styles.commentContent} numberOfLines={3}>
+                    {comment.content}
+                  </ThemedText>
+                </TouchableOpacity>
+              );
+            })}
           </ThemedView>
         )}
       </ScrollView>
@@ -612,41 +536,54 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderTopWidth: 1,
   },
-  similarContainer: {
+  commentsContainer: {
     marginTop: 16,
     paddingHorizontal: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
   },
-  similarTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+  commentsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
-  recommendedListContainer: {
-    gap: 8,
+  commentsTitle: {
+    fontSize: 18,
+    fontWeight: "600",
   },
-  recommendedItem: {
+  commentsAction: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 8,
-    gap: 12,
-  },
-  recommendedLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
-  },
-  recommendedInfo: {
-    flex: 1,
+    alignItems: "center",
     gap: 4,
-    minWidth: 0,
   },
-  recommendedTitle: {
+  commentsLink: {
     fontSize: 14,
     fontWeight: "600",
-    lineHeight: 18,
   },
-  recommendedCompany: {
+  commentPreviewCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  commentPreviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  commentAuthor: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  commentTime: {
     fontSize: 12,
+  },
+  commentContent: {
+    fontSize: 14,
+    lineHeight: 20,
   },
 });
 

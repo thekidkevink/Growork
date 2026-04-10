@@ -4,6 +4,7 @@ import { useFlashToast } from "@/components/ui/Flash";
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks";
 import { useAppContext } from "@/utils/AppContext";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -54,6 +55,14 @@ export default function LoginScreen() {
     <AuthScreenShell
       title="Sign in to GROWORK"
       subtitle="Continue to your jobs, saved content, and profile tools."
+      headerContent={
+        <Pressable
+          style={[styles.backButton, { borderColor: color.border, backgroundColor: color.background }]}
+          onPress={() => router.replace("/auth")}
+        >
+          <Ionicons name="arrow-back" size={18} color={color.text} />
+        </Pressable>
+      }
       footer={
         <View style={styles.footerRow}>
           <ThemedText style={styles.footerText}>
@@ -125,11 +134,11 @@ export default function LoginScreen() {
       </View>
 
       <Pressable
-        style={styles.inlineLinkRow}
+        style={[styles.inlineLinkRow, { borderColor: color.border }]}
         onPress={() => router.push("/auth/forgot-password")}
       >
         <ThemedText style={[styles.inlineLinkText, { color: color.text }]}>
-          Forgot password?
+          Forgot your password?
         </ThemedText>
       </Pressable>
 
@@ -156,6 +165,15 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    width: 44,
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
   fieldGroup: {
     gap: 8,
   },
@@ -197,7 +215,11 @@ const styles = StyleSheet.create({
   },
   inlineLinkRow: {
     alignSelf: "flex-end",
-    marginTop: -4,
+    marginTop: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   inlineLinkText: {
     fontSize: 13,

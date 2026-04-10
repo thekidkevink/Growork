@@ -1,5 +1,6 @@
 export * from './applications';
 export * from './ads';
+export * from './businessRequests';
 export * from './company';
 export * from './documents';
 export * from './enums';

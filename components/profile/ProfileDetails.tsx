@@ -10,6 +10,7 @@ import { ThemedText } from '../ThemedText';
 import { ThemedView } from '../ThemedView';
 import { Feather } from '@expo/vector-icons';
 import { ThemedInput } from '../ThemedInput';
+import DatePickerField from '../ui/DatePickerField';
 
 type ProfileDetailsProps = {
   profile: Profile;
@@ -54,6 +55,8 @@ export default function ProfileDetails({
           username: editedProfile.username,
           name: editedProfile.name,
           surname: editedProfile.surname,
+          date_of_birth: editedProfile.date_of_birth,
+          phone: editedProfile.phone,
           bio: editedProfile.bio,
         })
         .eq('id', profile.id);
@@ -158,6 +161,18 @@ export default function ProfileDetails({
                 placeholder="Username"
                 style={styles.editInput}
               />
+              <DatePickerField
+                value={editedProfile.date_of_birth || ''}
+                onChange={(value) => setEditedProfile({ ...editedProfile, date_of_birth: value })}
+                placeholder="Select date of birth"
+                maximumDate={new Date()}
+              />
+              <ThemedInput
+                value={editedProfile.phone || ''}
+                onChangeText={(text) => setEditedProfile({ ...editedProfile, phone: text })}
+                placeholder="Contact Number"
+                style={styles.editInput}
+              />
             </>
           ) : (
             <>
@@ -166,6 +181,12 @@ export default function ProfileDetails({
               </ThemedText>
               {profile.username && (
                 <ThemedText style={styles.username}>@{profile.username}</ThemedText>
+              )}
+              {profile.date_of_birth && (
+                <ThemedText style={styles.username}>{profile.date_of_birth}</ThemedText>
+              )}
+              {profile.phone && (
+                <ThemedText style={styles.username}>{profile.phone}</ThemedText>
               )}
             </>
           )}

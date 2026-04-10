@@ -48,9 +48,10 @@ async function waitForTriggeredProfile(userId: string): Promise<Profile | null> 
 export async function createProfileIfNotExists(
   userId: string,
   profileData: {
-    username: string;
     name: string;
     surname: string;
+    date_of_birth?: string | null;
+    phone?: string | null;
     user_type?: "user" | "business";
   }
 ): Promise<Profile | null> {
@@ -66,9 +67,11 @@ export async function createProfileIfNotExists(
     }
 
     const needsUpdate =
-      existingProfile.username !== profileData.username ||
       existingProfile.name !== profileData.name ||
       existingProfile.surname !== profileData.surname ||
+      (existingProfile.date_of_birth || null) !==
+        (profileData.date_of_birth || null) ||
+      (existingProfile.phone || null) !== (profileData.phone || null) ||
       existingProfile.user_type !== (profileData.user_type || "user");
 
     if (!needsUpdate) {
@@ -78,9 +81,10 @@ export async function createProfileIfNotExists(
     const { data: updatedProfile, error: updateError } = await supabase
       .from("profiles")
       .update({
-        username: profileData.username,
         name: profileData.name,
         surname: profileData.surname,
+        date_of_birth: profileData.date_of_birth || null,
+        phone: profileData.phone || null,
         user_type: profileData.user_type || "user",
       })
       .eq("id", userId)

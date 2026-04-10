@@ -10,7 +10,8 @@ export interface ProfileCompletenessResult {
 const requiredFields: Array<keyof Profile> = [
     'name',
     'surname',
-    'username',
+    'date_of_birth',
+    'phone',
 ];
 
 const recommendedFields: Array<keyof Profile> = [

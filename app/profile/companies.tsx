@@ -118,6 +118,7 @@ export default function CompaniesManagement() {
         />
         <UniversalHeader
           title="Companies"
+          centerTitle={true}
           showBackButton={true}
           showNotifications={false}
         />
@@ -136,13 +137,13 @@ export default function CompaniesManagement() {
       <ActionPromptModal
         visible={showBusinessPrompt}
         title="Business setup required"
-        message="Switch to a business-style profile and create your company first to manage companies here."
+        message="Request business access first. Once an admin approves it, you can create and manage companies here."
         cancelLabel="Not now"
-        confirmLabel="Set up business"
+        confirmLabel="Request access"
         onCancel={() => setShowBusinessPrompt(false)}
         onConfirm={() => {
           setShowBusinessPrompt(false);
-          router.push("/profile/edit-profile");
+          router.push("/profile/business-request");
         }}
       />
       <StatusBar
@@ -151,6 +152,7 @@ export default function CompaniesManagement() {
 
       <UniversalHeader
         title="Companies"
+        centerTitle={true}
         showBackButton={true}
         showNotifications={false}
       />
@@ -446,6 +448,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
+    marginTop: 6,
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,

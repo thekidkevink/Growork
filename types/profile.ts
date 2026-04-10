@@ -5,9 +5,11 @@ export interface Profile {
   full_name?: string | null;
   name: string;
   surname: string;
+  date_of_birth: string | null;
   avatar_url: string | null;
   bio: string | null;
   user_type: import('./enums').UserType;
+  profile_role?: import('./enums').ProfileRole | null;
   website: string | null;
   phone: string | null;
   location: string | null;
@@ -24,8 +26,10 @@ export interface ProfileFormData {
   name: string;
   surname: string;
   username: string;
+  date_of_birth: string;
   bio: string;
   user_type: import('./enums').UserType;
+  profile_role?: import('./enums').ProfileRole | null;
   website: string;
   phone: string;
   location: string;

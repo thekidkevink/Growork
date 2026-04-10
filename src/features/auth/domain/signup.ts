@@ -4,9 +4,10 @@ export interface SignupCredentialsInput {
 }
 
 export interface SignupProfileInput {
-  username: string;
   firstName: string;
   surname: string;
+  dateOfBirth: string;
+  contactNumber: string;
 }
 
 export interface SignupDraft {

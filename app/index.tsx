@@ -10,7 +10,7 @@ export default function RootIndex() {
   }
 
   if (!session?.user) {
-    return <Redirect href="/auth/login" />;
+    return <Redirect href="/auth" />;
   }
 
   return <Redirect href="/(tabs)" />;

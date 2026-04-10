@@ -1,19 +1,49 @@
 import AuthScreenShell from "@/components/ui/AuthScreenShell";
+import DatePickerField from "@/components/ui/DatePickerField";
 import { ThemedText } from "@/components/ThemedText";
 import { useFlashToast } from "@/components/ui/Flash";
 import { Colors } from "@/constants/Colors";
-import { useColorScheme, useThemeColor } from "@/hooks";
+import { useColorScheme } from "@/hooks";
 import {
   buildSignupResult,
   mapSignupPayload,
   signupRoutes,
 } from "@/src/features/auth/services/signupFlow";
 import { useAppContext } from "@/utils/AppContext";
-import { supabase } from "@/utils/supabase";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
+
+const DOB_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDateOfBirth(value: string) {
+  if (!DOB_PATTERN.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() + 1 !== month ||
+    date.getDate() !== day
+  ) {
+    return false;
+  }
+
+  return date <= new Date();
+}
 
 export default function UsernameStep() {
   const router = useRouter();
@@ -27,60 +57,26 @@ export default function UsernameStep() {
     : params.password;
   const { isLoading, signUp } = useAppContext();
   const toast = useFlashToast();
-  const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [surname, setSurname] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [isUnique, setIsUnique] = useState<boolean | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout | number | null>(null);
   const scheme = useColorScheme() ?? "light";
   const color = Colors[scheme];
-  const errorColor = "#e53935";
 
-  useEffect(() => {
-    const candidate = username.trim();
-    if (!candidate) {
-      setIsUnique(null);
-      setFormError(null);
-      setChecking(false);
-      return;
-    }
-
-    setChecking(true);
-    setIsUnique(null);
-    setFormError(null);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    debounceRef.current = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from("legacy_public_profiles")
-        .select("id")
-        .eq("username", candidate)
-        .maybeSingle();
-
-      setChecking(false);
-      if (error) {
-        setFormError("We could not check that username right now.");
-        setIsUnique(null);
-        return;
-      }
-
-      if (data) {
-        setIsUnique(false);
-        setFormError("That username is already taken.");
-      } else {
-        setIsUnique(true);
-        setFormError(null);
-      }
-    }, 400);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [username]);
+  const disableSubmit = useMemo(
+    () =>
+      isLoading ||
+      submitting ||
+      !name.trim() ||
+      !surname.trim() ||
+      !dateOfBirth.trim() ||
+      !contactNumber.trim(),
+    [contactNumber, dateOfBirth, isLoading, name, submitting, surname]
+  );
 
   const handleNext = async () => {
     setFormError(null);
@@ -96,42 +92,40 @@ export default function UsernameStep() {
       return;
     }
 
-    if (!username.trim()) {
+    if (!name.trim() || !surname.trim() || !dateOfBirth.trim() || !contactNumber.trim()) {
+      const message = "Please complete all required fields.";
+      setFormError(message);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       toast.show({
         type: "danger",
-        title: "Missing username",
-        message: "Please choose a username.",
+        title: "Missing details",
+        message,
       });
       return;
     }
 
-    if (!/^[a-zA-Z0-9_.-]{3,20}$/.test(username.trim())) {
+    if (!isValidDateOfBirth(dateOfBirth.trim())) {
+      const message = "Enter Date Of Birth in YYYY-MM-DD format.";
+      setFormError(message);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       toast.show({
         type: "danger",
-        title: "Invalid username",
-        message: "Use 3-20 letters, numbers, dots, dashes, or underscores.",
+        title: "Invalid date of birth",
+        message,
       });
       return;
     }
 
-    if (isUnique === false) {
+    const normalizedPhone = contactNumber.trim();
+    const digitsOnly = normalizedPhone.replace(/\D/g, "");
+    if (digitsOnly.length < 7) {
+      const message = "Enter a valid contact number.";
+      setFormError(message);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       toast.show({
         type: "danger",
-        title: "Username taken",
-        message: "Please choose a different username.",
-      });
-      return;
-    }
-
-    if (!name.trim() || !surname.trim()) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      toast.show({
-        type: "danger",
-        title: "Missing name",
-        message: "Please enter both your first name and surname.",
+        title: "Invalid contact number",
+        message,
       });
       return;
     }
@@ -142,18 +136,20 @@ export default function UsernameStep() {
       const payload = mapSignupPayload(
         { email, password },
         {
-          username,
           firstName: name,
           surname,
+          dateOfBirth,
+          contactNumber: normalizedPhone,
         }
       );
 
       const { error, data } = await signUp(
         payload.email,
         payload.password,
-        payload.metadata.username,
         payload.metadata.name,
-        payload.metadata.surname
+        payload.metadata.surname,
+        payload.metadata.date_of_birth,
+        payload.metadata.phone
       );
 
       if (error) {
@@ -188,7 +184,6 @@ export default function UsernameStep() {
         params: {
           email: payload.email,
           userId,
-          username: payload.metadata.username,
           firstName: payload.metadata.name,
         },
       });
@@ -205,19 +200,10 @@ export default function UsernameStep() {
     }
   };
 
-  const disableSubmit =
-    isLoading ||
-    submitting ||
-    checking ||
-    isUnique === false ||
-    !name.trim() ||
-    !surname.trim() ||
-    !username.trim();
-
   return (
     <AuthScreenShell
       title="Finish your profile"
-      subtitle="Choose a username and add the name you want shown on your account."
+      subtitle="Add your required personal details to complete account setup."
       footer={
         <View style={styles.footerRow}>
           <Pressable
@@ -235,47 +221,15 @@ export default function UsernameStep() {
               router.replace(signupRoutes.login);
             }}
           >
-            <ThemedText style={[styles.footerLink, { color: color.text }]}>Log in instead</ThemedText>
+            <ThemedText style={[styles.footerLink, { color: color.text }]}>
+              Log in instead
+            </ThemedText>
           </Pressable>
         </View>
       }
     >
       <View style={styles.fieldGroup}>
-        <ThemedText style={styles.label}>Username</ThemedText>
-        <View style={styles.usernameWrapper}>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: color.background,
-                borderColor: formError ? errorColor : color.border,
-                color: color.text,
-              },
-            ]}
-            placeholder="Choose a username"
-            placeholderTextColor={color.mutedText}
-            autoCapitalize="none"
-            value={username}
-            onChangeText={setUsername}
-          />
-          {checking ? (
-            <ActivityIndicator size="small" color={color.iconSecondary} style={styles.spinner} />
-          ) : null}
-        </View>
-        {isUnique === false && username.trim().length > 0 ? (
-          <ThemedText style={[styles.helperText, { color: errorColor }]}>
-            That username is already taken.
-          </ThemedText>
-        ) : null}
-        {isUnique === true && username.trim().length > 0 ? (
-          <ThemedText style={[styles.helperText, { color: color.text }]}>
-            Username is available.
-          </ThemedText>
-        ) : null}
-      </View>
-
-      <View style={styles.fieldGroup}>
-        <ThemedText style={styles.label}>First name</ThemedText>
+        <ThemedText style={styles.label}>Name *</ThemedText>
         <TextInput
           style={[
             styles.input,
@@ -287,14 +241,16 @@ export default function UsernameStep() {
           ]}
           placeholder="Enter your first name"
           placeholderTextColor={color.mutedText}
-          autoCapitalize="words"
           value={name}
-          onChangeText={setName}
+          onChangeText={(value) => {
+            setName(value);
+            if (formError) setFormError(null);
+          }}
         />
       </View>
 
       <View style={styles.fieldGroup}>
-        <ThemedText style={styles.label}>Surname</ThemedText>
+        <ThemedText style={styles.label}>Surname *</ThemedText>
         <TextInput
           style={[
             styles.input,
@@ -306,34 +262,77 @@ export default function UsernameStep() {
           ]}
           placeholder="Enter your surname"
           placeholderTextColor={color.mutedText}
-          autoCapitalize="words"
           value={surname}
-          onChangeText={setSurname}
+          onChangeText={(value) => {
+            setSurname(value);
+            if (formError) setFormError(null);
+          }}
         />
       </View>
+
+      <View style={styles.fieldGroup}>
+        <ThemedText style={styles.label}>Date Of Birth *</ThemedText>
+        <DatePickerField
+          value={dateOfBirth}
+          onChange={(value) => {
+            setDateOfBirth(value);
+            if (formError) setFormError(null);
+          }}
+          placeholder="Select your date of birth"
+          maximumDate={new Date()}
+        />
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <ThemedText style={styles.label}>Contact Number *</ThemedText>
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: color.background,
+              borderColor: color.border,
+              color: color.text,
+            },
+          ]}
+          placeholder="Enter your contact number"
+          placeholderTextColor={color.mutedText}
+          keyboardType="phone-pad"
+          value={contactNumber}
+          onChangeText={(value) => {
+            setContactNumber(value);
+            if (formError) setFormError(null);
+          }}
+        />
+      </View>
+
+      {formError ? (
+        <ThemedText style={styles.inlineError}>{formError}</ThemedText>
+      ) : null}
+
+      {signupError ? (
+        <ThemedText style={styles.inlineError}>{signupError}</ThemedText>
+      ) : null}
 
       <Pressable
         style={({ pressed }) => [
           styles.primaryButton,
           { backgroundColor: color.text },
           disableSubmit && styles.primaryButtonDisabled,
-          pressed && !disableSubmit && styles.primaryButtonPressed,
+          pressed && styles.primaryButtonPressed,
         ]}
         onPress={handleNext}
         disabled={disableSubmit}
       >
-        <ThemedText style={[styles.primaryButtonText, { color: color.background }]}>
-          {submitting || isLoading ? "Creating account..." : "Create Account"}
-        </ThemedText>
+        {submitting ? (
+          <ActivityIndicator color={color.background} />
+        ) : (
+          <ThemedText
+            style={[styles.primaryButtonText, { color: color.background }]}
+          >
+            Create account
+          </ThemedText>
+        )}
       </Pressable>
-
-      {signupError ? (
-        <ThemedText style={styles.signupError}>{signupError}</ThemedText>
-      ) : null}
-
-      <ThemedText style={[styles.supportText, { color: color.mutedText }]}>
-        Business tools can be unlocked later when you create or manage a company.
-      </ThemedText>
     </AuthScreenShell>
   );
 }
@@ -346,10 +345,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  usernameWrapper: {
-    width: "100%",
-    position: "relative",
-  },
   input: {
     width: "100%",
     borderWidth: 1,
@@ -361,44 +356,28 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     color: "#000",
   },
-  spinner: {
-    position: "absolute",
-    right: 12,
-    top: "50%",
-    marginTop: -10,
-  },
-  helperText: {
-    width: "100%",
-    marginTop: -4,
-    marginBottom: 2,
-  },
-  signupError: {
-    color: "#e53935",
-    textAlign: "center",
-  },
-  supportText: {
-    textAlign: "center",
+  inlineError: {
     fontSize: 13,
-    lineHeight: 19,
-    color: "#6e6e6e",
+    color: "#e53935",
+    marginTop: -2,
   },
   primaryButton: {
-    marginTop: 6,
+    marginTop: 8,
     paddingVertical: 14,
     borderRadius: 999,
     alignItems: "center",
     backgroundColor: "#525252",
   },
-  primaryButtonDisabled: {
-    opacity: 0.45,
-  },
   primaryButtonPressed: {
     opacity: 0.86,
   },
+  primaryButtonDisabled: {
+    opacity: 0.45,
+  },
   primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
     fontWeight: "700",
+    fontSize: 16,
+    color: "#ffffff",
   },
   footerRow: {
     flexDirection: "row",
@@ -414,4 +393,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-

@@ -7,6 +7,7 @@ export default function AuthLayout() {
     <ScreenContainer>
       <StackNavigator
         screens={[
+          { name: "index" },
           { name: "login" },
           { name: "forgot-password" },
           { name: "reset-password" },

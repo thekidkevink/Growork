@@ -1,8 +1,48 @@
 pluginManagement {
+  def resolveNodeExecutable = {
+    def envNode = System.getenv("NODE_BINARY")
+    if (envNode) {
+      return envNode
+    }
+
+    def candidates = []
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+      candidates.add("node.exe")
+      candidates.add("node")
+
+      def programFiles = System.getenv("ProgramFiles")
+      if (programFiles) {
+        candidates.add(new File(programFiles, "nodejs/node.exe").absolutePath)
+      }
+
+      def programFilesX86 = System.getenv("ProgramFiles(x86)")
+      if (programFilesX86) {
+        candidates.add(new File(programFilesX86, "nodejs/node.exe").absolutePath)
+      }
+    } else {
+      candidates.add("node")
+    }
+
+    for (candidate in candidates) {
+      try {
+        providers.exec {
+          workingDir(rootDir)
+          commandLine(candidate, "--version")
+        }.result.get()
+        return candidate
+      } catch (Exception ignored) {
+      }
+    }
+
+    return "node"
+  }
+
+  def nodeExecutable = resolveNodeExecutable()
+
   def reactNativeGradlePlugin = new File(
     providers.exec {
       workingDir(rootDir)
-      commandLine("node", "--print", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [require.resolve('react-native/package.json')] })")
+      commandLine(nodeExecutable, "--print", "require.resolve('@react-native/gradle-plugin/package.json', { paths: [require.resolve('react-native/package.json')] })")
     }.standardOutput.asText.get().trim()
   ).getParentFile().absolutePath
   includeBuild(reactNativeGradlePlugin)
@@ -10,7 +50,7 @@ pluginManagement {
   def expoPluginsPath = new File(
     providers.exec {
       workingDir(rootDir)
-      commandLine("node", "--print", "require.resolve('expo-modules-autolinking/package.json', { paths: [require.resolve('expo/package.json')] })")
+      commandLine(nodeExecutable, "--print", "require.resolve('expo-modules-autolinking/package.json', { paths: [require.resolve('expo/package.json')] })")
     }.standardOutput.asText.get().trim(),
     "../android/expo-gradle-plugin"
   ).absolutePath

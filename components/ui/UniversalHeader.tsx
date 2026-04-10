@@ -10,6 +10,8 @@ import NotificationBadge from "@/components/ui/NotificationBadge";
 interface UniversalHeaderProps {
   title: string;
   subtitle?: string;
+  centerTitle?: boolean;
+  titleOffsetY?: number;
   showBackButton?: boolean;
   showNotifications?: boolean;
   showAddButton?: boolean;
@@ -24,6 +26,8 @@ interface UniversalHeaderProps {
 export default function UniversalHeader({
   title,
   subtitle,
+  centerTitle = false,
+  titleOffsetY = 0,
   showBackButton = false,
   showNotifications = true,
   showAddButton = false,
@@ -47,7 +51,7 @@ export default function UniversalHeader({
       ]}
     >
       <View style={styles.topRow}>
-        <View style={styles.leftSection}>
+        <View style={[styles.leftSection, centerTitle && styles.leftSectionCentered]}>
           {showBackButton && (
             <Pressable
               style={styles.iconButton}
@@ -57,16 +61,20 @@ export default function UniversalHeader({
               <Feather name="arrow-left" size={22} color={iconColor} />
             </Pressable>
           )}
-          <View style={styles.titleSection}>
+          <View style={[styles.titleSection, centerTitle && styles.titleSectionCentered]}>
             <ThemedText
-              style={[styles.title, { color: textColor }]}
+              style={[
+                styles.title,
+                centerTitle && styles.titleCentered,
+                { color: textColor, marginTop: titleOffsetY },
+              ]}
               numberOfLines={1}
             >
               {title}
             </ThemedText>
             {subtitle && (
               <ThemedText
-                style={[styles.subtitle, { color: mutedTextColor }]}
+                style={[styles.subtitle, centerTitle && styles.subtitleCentered, { color: mutedTextColor }]}
                 numberOfLines={1}
               >
                 {subtitle}
@@ -126,6 +134,7 @@ export default function UniversalHeader({
 
 const styles = StyleSheet.create({
   header: {
+    paddingTop: 8,
     paddingBottom: 16,
     paddingHorizontal: 16,
   },
@@ -139,6 +148,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
+  leftSectionCentered: {
+    minWidth: 0,
+  },
   rightSection: {
     flexDirection: "row",
     alignItems: "center",
@@ -149,14 +161,28 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
+  titleSectionCentered: {
+    marginLeft: 0,
+    alignItems: "center",
+  },
   title: {
     fontSize: 18,
     fontWeight: "bold",
+    lineHeight: 24,
     letterSpacing: 0.5,
+    includeFontPadding: false,
+  },
+  titleCentered: {
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 14,
+    lineHeight: 18,
     marginTop: 2,
+    includeFontPadding: false,
+  },
+  subtitleCentered: {
+    textAlign: "center",
   },
   bellContainer: {
     position: "relative",

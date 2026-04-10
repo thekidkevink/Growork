@@ -30,7 +30,13 @@ import {
 
 interface Document {
   id: string;
-  type: "cv" | "cover_letter" | "certificate" | "other";
+  type:
+    | "cv"
+    | "cover_letter"
+    | "qualification"
+    | "national_id"
+    | "drivers_licence"
+    | "other";
   name: string | null;
   file_url: string;
   uploaded_at: string;
@@ -153,6 +159,12 @@ export default function ApplicationDetailScreen() {
         return "file-text";
       case "certificate":
         return "award";
+      case "qualification":
+        return "award";
+      case "national_id":
+        return "credit-card";
+      case "drivers_licence":
+        return "credit-card";
       case "other":
         return "file";
       default:
@@ -280,7 +292,11 @@ export default function ApplicationDetailScreen() {
               applicationData.resume_id,
               applicationData.cover_letter_id,
               applicationData.cv_document_id_snapshot,
+              applicationData.application_snapshot?.submitted_qualification_document_id,
               applicationData.application_snapshot?.submitted_cv_document_id,
+              applicationData.application_snapshot?.submitted_cover_letter_document_id,
+              applicationData.application_snapshot?.submitted_national_id_document_id,
+              applicationData.application_snapshot?.submitted_drivers_licence_document_id,
             ].filter(Boolean)
           )
         ) as string[];

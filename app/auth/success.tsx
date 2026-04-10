@@ -13,17 +13,13 @@ export default function SuccessScreen() {
   const params = useLocalSearchParams<{
     email?: string;
     firstName?: string;
-    username?: string;
   }>();
   const router = useRouter();
   const firstName = Array.isArray(params.firstName)
     ? params.firstName[0]
     : params.firstName;
   const email = Array.isArray(params.email) ? params.email[0] : params.email;
-  const username = Array.isArray(params.username)
-    ? params.username[0]
-    : params.username;
-  const displayName = firstName || username || "there";
+  const displayName = firstName || "there";
   const scheme = useColorScheme() ?? "light";
   const color = Colors[scheme];
   const { session } = useAuth();

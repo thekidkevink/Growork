@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Animated } from "react-native";
+import { View, Animated, StyleSheet } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import ContentCard from "@/components/content/ContentCard";
@@ -87,6 +87,9 @@ export const CompanyPosts: React.FC<CompanyPostsProps> = ({
   companyId,
   posts: providedPosts,
 }) => {
+  const textColor = useThemeColor({}, "text");
+  const mutedTextColor = useThemeColor({}, "mutedText");
+  const borderColor = useThemeColor({}, "border");
   const { posts: fetchedPosts, loading, error } = useCompanyPosts(companyId);
 
   // Use provided posts if available, otherwise use fetched posts
@@ -117,6 +120,14 @@ export const CompanyPosts: React.FC<CompanyPostsProps> = ({
   if (error) {
     return (
       <ThemedView style={styles.container}>
+        <View style={[styles.sectionHeader, { borderColor }]}>
+          <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+            Activity
+          </ThemedText>
+          <ThemedText style={[styles.sectionSubtitle, { color: mutedTextColor }]}>
+            Updates and current opportunities from this company.
+          </ThemedText>
+        </View>
         <View style={styles.emptyState}>
           <ThemedText style={styles.emptyStateText}>
             Error loading posts
@@ -129,6 +140,14 @@ export const CompanyPosts: React.FC<CompanyPostsProps> = ({
   if (companyPosts.length === 0) {
     return (
       <ThemedView style={styles.container}>
+        <View style={[styles.sectionHeader, { borderColor }]}>
+          <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+            Activity
+          </ThemedText>
+          <ThemedText style={[styles.sectionSubtitle, { color: mutedTextColor }]}>
+            Updates and current opportunities from this company.
+          </ThemedText>
+        </View>
         <View style={styles.emptyState}>
           <ThemedText style={styles.emptyStateText}>
             No posts yet from this company
@@ -140,6 +159,14 @@ export const CompanyPosts: React.FC<CompanyPostsProps> = ({
 
   return (
     <ThemedView style={styles.container}>
+      <View style={[styles.sectionHeader, { borderColor }]}>
+        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+          Activity
+        </ThemedText>
+        <ThemedText style={[styles.sectionSubtitle, { color: mutedTextColor }]}>
+          Updates and current opportunities from this company.
+        </ThemedText>
+      </View>
       <View style={styles.postsContainer}>
         {companyPosts.map((post: any) => {
           const profile = post.profiles;
@@ -172,10 +199,24 @@ export const CompanyPosts: React.FC<CompanyPostsProps> = ({
   );
 };
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  sectionHeader: {
+    borderTopWidth: 1,
+    paddingTop: 18,
+    marginBottom: 14,
+    gap: 4,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700" as const,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   postsContainer: {
     gap: 12,
@@ -193,6 +234,6 @@ const styles = {
   emptyStateText: {
     fontSize: 14,
     opacity: 0.6,
-    textAlign: "center" as const,
+    textAlign: "center",
   },
-};
+});

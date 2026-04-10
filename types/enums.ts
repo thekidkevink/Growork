@@ -19,13 +19,20 @@ export enum ApplicationStatus {
 export enum DocumentType {
   CV = 'cv',
   CoverLetter = 'cover_letter',
-  Certificate = 'certificate',
+  Qualification = 'qualification',
+  NationalId = 'national_id',
+  DriversLicence = 'drivers_licence',
   Other = 'other',
 }
 
 export enum UserType {
   User = 'user',
   Business = 'business',
+}
+
+export enum ProfileRole {
+  User = 'user',
+  Admin = 'admin',
 }
 
 export enum NotificationType {

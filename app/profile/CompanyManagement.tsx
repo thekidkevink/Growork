@@ -171,6 +171,42 @@ const CompanyManagement = () => {
       return;
     }
 
+    const trimmedName = editedCompany.name.trim();
+    const trimmedDescription = editedCompany.description.trim();
+    const trimmedIndustry = editedCompany.industry.trim();
+    const trimmedContactEmail = editedCompany.contact_email.trim();
+    const trimmedLocation = editedCompany.location.trim();
+
+    if (
+      !trimmedName ||
+      !trimmedDescription ||
+      !trimmedIndustry ||
+      !trimmedContactEmail ||
+      !trimmedLocation
+    ) {
+      const validationMessage =
+        "Company name, description, industry, contact email, and location are required.";
+      setError(validationMessage);
+      toast.show({
+        type: "info",
+        title: "Missing required fields",
+        message: validationMessage,
+      });
+      return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(trimmedContactEmail)) {
+      const validationMessage = "Enter a valid contact email address.";
+      setError(validationMessage);
+      toast.show({
+        type: "info",
+        title: "Invalid email",
+        message: validationMessage,
+      });
+      return;
+    }
+
     setLoading(true);
     setError(null);
     let upgradedProfileForCreation = false;
@@ -184,6 +220,13 @@ const CompanyManagement = () => {
 
       const companyData = {
         ...editedCompany,
+        name: trimmedName,
+        description: trimmedDescription,
+        industry: trimmedIndustry,
+        contact_email: trimmedContactEmail,
+        location: trimmedLocation,
+        website: editedCompany.website.trim(),
+        size: editedCompany.size.trim(),
         founded_year: foundedYearValue,
         user_id: user.id,
         owner_id: user.id,
@@ -491,7 +534,7 @@ const CompanyManagement = () => {
                 title: "Basic Information",
                 data: [
                   {
-                    title: "Company Name",
+                    title: "Company Name *",
                     subtitle: editedCompany.name || "Not set",
                     icon: "home",
                     showTextInput: true,
@@ -501,7 +544,7 @@ const CompanyManagement = () => {
                       setEditedCompany((p) => ({ ...p, name: text })),
                   },
                   {
-                    title: "Description",
+                    title: "Description *",
                     subtitle: editedCompany.description || "No description",
                     icon: "file-text",
                     showTextInput: true,
@@ -512,7 +555,7 @@ const CompanyManagement = () => {
                     textInputProps: { multiline: true, numberOfLines: 3 },
                   },
                   {
-                    title: "Industry",
+                    title: "Industry *",
                     subtitle: editedCompany.industry || "Not set",
                     icon: "briefcase",
                     showTextInput: true,
@@ -537,7 +580,7 @@ const CompanyManagement = () => {
                       setEditedCompany((p) => ({ ...p, website: text })),
                   },
                   {
-                    title: "Contact Email",
+                    title: "Contact Email *",
                     subtitle: editedCompany.contact_email || "Not set",
                     icon: "mail",
                     showTextInput: true,
@@ -578,7 +621,7 @@ const CompanyManagement = () => {
                     textInputProps: { keyboardType: "numeric" },
                   },
                   {
-                    title: "Location",
+                    title: "Location *",
                     subtitle: editedCompany.location || "Not set",
                     icon: "map-pin",
                     showTextInput: true,

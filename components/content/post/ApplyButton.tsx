@@ -5,6 +5,7 @@ import {
   Platform,
   Text,
   useColorScheme,
+  ViewStyle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Colors } from "@/constants/Colors";
@@ -38,15 +39,18 @@ export default function ApplyButton({
     ? palette.tint
     : palette.background;
 
-  // Text color logic: white for all variants in dark, standard palette otherwise
+  const solidBorderColor = applied
+    ? "#10b981"
+    : variant === "primary"
+    ? palette.tint
+    : palette.border;
+
+  // Keep the label high-contrast against the filled surface in both themes.
   const textColor = applied
     ? "#fff"
-    : scheme === "dark"
-    ? "#fff"
     : variant === "primary"
-    ? palette.background
+    ? palette.accentContrast
     : palette.text;
-  const borderColor = palette.border;
 
   // Compact size options
   const buttonSizes = {
@@ -69,18 +73,21 @@ export default function ApplyButton({
     onPress();
   };
 
+  const buttonStyle: ViewStyle = {
+    backgroundColor,
+    paddingVertical: buttonSizes[size].paddingVertical,
+    paddingHorizontal: buttonSizes[size].paddingHorizontal,
+    borderWidth: variant === "primary" ? 1 : variant === "secondary" ? 1 : 0,
+    borderColor: solidBorderColor,
+    opacity: disabled || applied ? 0.7 : 1,
+  };
+
   return (
     <TouchableOpacity
       style={[
         styles.button,
-        {
-          backgroundColor,
-          paddingVertical: buttonSizes[size].paddingVertical,
-          paddingHorizontal: buttonSizes[size].paddingHorizontal,
-          borderWidth: variant === "secondary" ? 1 : 0,
-          borderColor: variant === "secondary" ? borderColor : undefined,
-          opacity: disabled || applied ? 0.7 : 1,
-        },
+        buttonStyle,
+        variant === "primary" && styles.primaryButton,
         style,
       ]}
       onPress={handlePress}
@@ -108,6 +115,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minWidth: 80,
+  },
+  primaryButton: {
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   buttonText: {
     fontWeight: "600",

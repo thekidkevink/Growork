@@ -1,22 +1,23 @@
+import { Feather } from "@expo/vector-icons";
+import * as ExpoLinking from "expo-linking";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
-  View,
-  StyleSheet,
-  StatusBar,
-  TouchableOpacity,
   Linking,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Feather } from "@expo/vector-icons";
 
-import { useAppTheme, useAuth, useColorScheme, useThemeColor } from "@/hooks";
+import ScreenContainer from "@/components/ScreenContainer";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import ScreenContainer from "@/components/ScreenContainer";
-import SettingsList from "@/components/ui/SettingsList";
 import ActionPromptModal from "@/components/ui/ActionPromptModal";
 import { useFlashToast } from "@/components/ui/Flash";
 import SelectionPromptModal from "@/components/ui/SelectionPromptModal";
+import SettingsList from "@/components/ui/SettingsList";
+import { useAppTheme, useAuth, useColorScheme, useThemeColor } from "@/hooks";
 
 interface SettingsItemProps {
   title: string;
@@ -49,12 +50,14 @@ export default function Settings() {
   const { setThemePreference, themePreference } = useAppTheme();
   const textColor = useThemeColor({}, "text");
   const borderColor = useThemeColor({}, "border");
-  const supportEmail = "support@growork.app";
+  const supportEmail = "isostasyglobal@gmail.com";
+  const supportPhone = "+264813781762";
   const toast = useFlashToast();
   const [showResetPrompt, setShowResetPrompt] = React.useState(false);
   const [showSignOutPrompt, setShowSignOutPrompt] = React.useState(false);
   const [showDeletePrompt, setShowDeletePrompt] = React.useState(false);
   const [showAppearancePrompt, setShowAppearancePrompt] = React.useState(false);
+  const [showContactPrompt, setShowContactPrompt] = React.useState(false);
 
   const appearanceSubtitle =
     themePreference === "system"
@@ -72,6 +75,22 @@ export default function Settings() {
         type: "info",
         title: "Support",
         message: `Please email us at ${supportEmail} and we will help you out.`,
+      });
+      return;
+    }
+
+    await Linking.openURL(url);
+  };
+
+  const openSupportPhone = async () => {
+    const url = `tel:${supportPhone}`;
+    const canOpen = await Linking.canOpenURL(url);
+
+    if (!canOpen) {
+      toast.show({
+        type: "info",
+        title: "Call support",
+        message: `Please call us on ${supportPhone}.`,
       });
       return;
     }
@@ -143,7 +162,7 @@ export default function Settings() {
       data: [
         {
           title: "Manage Documents",
-          subtitle: "CV, certificates, portfolio",
+          subtitle: "CV, qualifications, IDs",
           icon: "folder",
           onPress: () => router.push("/profile/documents"),
         },
@@ -152,12 +171,6 @@ export default function Settings() {
           subtitle: "Manage followed companies",
           icon: "briefcase",
           onPress: () => router.push("/profile/companies"),
-        },
-        {
-          title: "Media Outlets",
-          subtitle: "Podcasts, news, voice content",
-          icon: "radio",
-          onPress: () => router.push("/(tabs)/search"),
         },
       ],
     },
@@ -195,15 +208,15 @@ export default function Settings() {
       data: [
         {
           title: "Help Center",
-          subtitle: "Get help and support",
+          subtitle: "Support articles and FAQs",
           icon: "help-circle",
-          onPress: () => openSupportEmail("GROWORK Help Request"),
+          onPress: () => router.push("/help-center"),
         },
         {
           title: "Contact Us",
           subtitle: "Reach out to our team",
           icon: "mail",
-          onPress: () => openSupportEmail("GROWORK Support"),
+          onPress: () => setShowContactPrompt(true),
         },
         {
           title: "About",
@@ -253,8 +266,12 @@ export default function Settings() {
           setShowResetPrompt(false);
           try {
             const { supabase } = await import("@/utils/supabase");
+            const redirectTo = ExpoLinking.createURL("/auth/reset-password");
             const { error } = await supabase.auth.resetPasswordForEmail(
-              user?.email || ""
+              user?.email || "",
+              {
+                redirectTo,
+              }
             );
             if (error) throw error;
             toast.show({
@@ -296,6 +313,29 @@ export default function Settings() {
           setShowDeletePrompt(false);
           void openSupportEmail("GROWORK Account Deletion Request");
         }}
+      />
+      <SelectionPromptModal
+        visible={showContactPrompt}
+        title="Contact Us"
+        message={`Email: ${supportEmail}\nPhone: ${supportPhone}`}
+        options={[
+          {
+            label: "Email Support",
+            onPress: () => {
+              setShowContactPrompt(false);
+              void openSupportEmail("GROWORK Support");
+            },
+          },
+          {
+            label: "Call Support",
+            onPress: () => {
+              setShowContactPrompt(false);
+              void openSupportPhone();
+            },
+          },
+        ]}
+        cancelLabel="Close"
+        onCancel={() => setShowContactPrompt(false)}
       />
       <SelectionPromptModal
         visible={showAppearancePrompt}

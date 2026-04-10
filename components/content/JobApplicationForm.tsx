@@ -75,7 +75,14 @@ export default function JobApplicationForm({
   const [loading, setLoading] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
   const [selectedResume, setSelectedResume] = useState<Document | null>(null);
+  const [selectedQualification, setSelectedQualification] =
+    useState<Document | null>(null);
   const [selectedCoverLetter, setSelectedCoverLetter] =
+    useState<Document | null>(null);
+  const [selectedNationalId, setSelectedNationalId] = useState<Document | null>(
+    null
+  );
+  const [selectedDriversLicence, setSelectedDriversLicence] =
     useState<Document | null>(null);
   const [hasApplied, setHasApplied] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -99,7 +106,10 @@ export default function JobApplicationForm({
           checkIfApplied(user.id, jobPost.id),
           Promise.all([
             fetchDocuments(DocumentType.CV),
+            fetchDocuments(DocumentType.Qualification),
             fetchDocuments(DocumentType.CoverLetter),
+            fetchDocuments(DocumentType.NationalId),
+            fetchDocuments(DocumentType.DriversLicence),
           ]),
         ]);
 
@@ -141,14 +151,30 @@ export default function JobApplicationForm({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const handleSelectQualification = (document: Document) => {
+    setSelectedQualification(document);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleSelectNationalId = (document: Document) => {
+    setSelectedNationalId(document);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleSelectDriversLicence = (document: Document) => {
+    setSelectedDriversLicence(document);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   const handleNextStep = () => {
     if (currentStep === ApplicationStep.CVSelection) {
-      if (!selectedResume) {
+      if (!selectedResume || !selectedQualification || !selectedNationalId) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         toast.show({
           type: "danger",
-          title: "Missing CV",
-          message: "Please select a CV to continue.",
+          title: "Required documents missing",
+          message:
+            "Please select your CV, qualifications, and national ID to continue.",
         });
         return;
       }
@@ -173,7 +199,9 @@ export default function JobApplicationForm({
   };
 
   const handleSubmit = async () => {
-    if (!user || !selectedResume) return;
+    if (!user || !selectedResume || !selectedQualification || !selectedNationalId) {
+      return;
+    }
     setLoading(true);
     try {
       const applicantName =
@@ -203,6 +231,11 @@ export default function JobApplicationForm({
             title: jobPost.title || null,
           },
           submitted_cv_document_id: selectedResume.id,
+          submitted_qualification_document_id: selectedQualification.id,
+          submitted_cover_letter_document_id: selectedCoverLetter?.id || null,
+          submitted_national_id_document_id: selectedNationalId?.id || null,
+          submitted_drivers_licence_document_id:
+            selectedDriversLicence?.id || null,
         },
       });
       if (error) throw error;
@@ -267,6 +300,12 @@ export default function JobApplicationForm({
                       name: selectedResume.name,
                       file_url: selectedResume.file_url,
                     },
+                    {
+                      id: selectedQualification.id,
+                      type: "qualification",
+                      name: selectedQualification.name,
+                      file_url: selectedQualification.file_url,
+                    },
                     ...(selectedCoverLetter
                       ? [
                           {
@@ -274,6 +313,26 @@ export default function JobApplicationForm({
                             type: "cover_letter",
                             name: selectedCoverLetter.name,
                             file_url: selectedCoverLetter.file_url,
+                          },
+                        ]
+                      : []),
+                    ...(selectedNationalId
+                      ? [
+                          {
+                            id: selectedNationalId.id,
+                            type: "national_id",
+                            name: selectedNationalId.name,
+                            file_url: selectedNationalId.file_url,
+                          },
+                        ]
+                      : []),
+                    ...(selectedDriversLicence
+                      ? [
+                          {
+                            id: selectedDriversLicence.id,
+                            type: "drivers_licence",
+                            name: selectedDriversLicence.name,
+                            file_url: selectedDriversLicence.file_url,
                           },
                         ]
                       : []),
@@ -396,13 +455,41 @@ export default function JobApplicationForm({
         return (
           <>
             <ThemedText type="subtitle" style={{ marginBottom: 12 }}>
-              Select Your CV
+              Required Documents
+            </ThemedText>
+            <ThemedText style={{ opacity: 0.7, marginBottom: 12 }}>
+              Select your CV, qualifications, and national ID to continue.
+            </ThemedText>
+            <ThemedText type="subtitle" style={{ marginBottom: 12 }}>
+              CV
             </ThemedText>
             <DocumentManager
               userId={user?.id}
               documentType={DocumentType.CV}
               selectable
               onSelect={handleSelectResume}
+              disableScrolling={true}
+            />
+
+            <ThemedText type="subtitle" style={{ marginTop: 20, marginBottom: 12 }}>
+              Qualifications
+            </ThemedText>
+            <DocumentManager
+              userId={user?.id}
+              documentType={DocumentType.Qualification}
+              selectable
+              onSelect={handleSelectQualification}
+              disableScrolling={true}
+            />
+
+            <ThemedText type="subtitle" style={{ marginTop: 20, marginBottom: 12 }}>
+              National ID
+            </ThemedText>
+            <DocumentManager
+              userId={user?.id}
+              documentType={DocumentType.NationalId}
+              selectable
+              onSelect={handleSelectNationalId}
               disableScrolling={true}
             />
           </>
@@ -439,6 +526,17 @@ export default function JobApplicationForm({
               onSelect={handleSelectCoverLetter}
               disableScrolling={true}
             />
+
+            <ThemedText type="subtitle" style={{ marginTop: 20, marginBottom: 12 }}>
+              Driver's Licence (Optional)
+            </ThemedText>
+            <DocumentManager
+              userId={user?.id}
+              documentType={DocumentType.DriversLicence}
+              selectable
+              onSelect={handleSelectDriversLicence}
+              disableScrolling={true}
+            />
           </>
         );
       case ApplicationStep.Review:
@@ -466,6 +564,15 @@ export default function JobApplicationForm({
 
             <View style={{ marginBottom: 12 }}>
               <ThemedText style={{ fontWeight: "600", marginBottom: 4 }}>
+                Qualifications:
+              </ThemedText>
+              {selectedQualification && (
+                <DocumentCard document={selectedQualification} showMenu={false} />
+              )}
+            </View>
+
+            <View style={{ marginBottom: 12 }}>
+              <ThemedText style={{ fontWeight: "600", marginBottom: 4 }}>
                 Cover Letter:
               </ThemedText>
               {coverLetter ? (
@@ -485,6 +592,35 @@ export default function JobApplicationForm({
               ) : (
                 <ThemedText style={{ fontStyle: "italic", opacity: 0.6 }}>
                   No cover letter provided
+                </ThemedText>
+              )}
+            </View>
+
+            <View style={{ marginBottom: 12 }}>
+              <ThemedText style={{ fontWeight: "600", marginBottom: 4 }}>
+                National ID:
+              </ThemedText>
+              {selectedNationalId ? (
+                <DocumentCard document={selectedNationalId} showMenu={false} />
+              ) : (
+                <ThemedText style={{ fontStyle: "italic", opacity: 0.6 }}>
+                  Required
+                </ThemedText>
+              )}
+            </View>
+
+            <View style={{ marginBottom: 12 }}>
+              <ThemedText style={{ fontWeight: "600", marginBottom: 4 }}>
+                Driver's Licence:
+              </ThemedText>
+              {selectedDriversLicence ? (
+                <DocumentCard
+                  document={selectedDriversLicence}
+                  showMenu={false}
+                />
+              ) : (
+                <ThemedText style={{ fontStyle: "italic", opacity: 0.6 }}>
+                  Not provided
                 </ThemedText>
               )}
             </View>
@@ -564,13 +700,15 @@ export default function JobApplicationForm({
           onPress={handleNextStep}
           disabled={
             loading ||
-            (currentStep === ApplicationStep.CVSelection && !selectedResume)
+            (currentStep === ApplicationStep.CVSelection &&
+              (!selectedResume || !selectedQualification || !selectedNationalId))
           }
           hitSlop={10}
           style={({ pressed }) => ({
             opacity:
               loading ||
-              (currentStep === ApplicationStep.CVSelection && !selectedResume)
+              (currentStep === ApplicationStep.CVSelection &&
+                (!selectedResume || !selectedQualification || !selectedNationalId))
                 ? 0.5
                 : pressed
                   ? 0.7
@@ -583,7 +721,8 @@ export default function JobApplicationForm({
             style={{
               color:
                 loading ||
-                (currentStep === ApplicationStep.CVSelection && !selectedResume)
+                (currentStep === ApplicationStep.CVSelection &&
+                  (!selectedResume || !selectedQualification || !selectedNationalId))
                   ? "#999"
                   : "#525252",
             }}

@@ -18,6 +18,7 @@ import { ThemedView } from "@/components/ThemedView";
 import ScreenContainer from "@/components/ScreenContainer";
 import DocumentManager from "@/components/content/DocumentManager";
 import DocumentCard from "@/components/content/DocumentCard";
+import DocumentEditSheet from "@/components/profile/DocumentEditSheet";
 import { Document, DocumentType } from "@/types";
 import { useFlashToast } from "@/components/ui/Flash";
 import { openGlobalSheet } from "@/utils/globalSheet";
@@ -25,7 +26,9 @@ import { openGlobalSheet } from "@/utils/globalSheet";
 const DOCUMENT_CATEGORIES = [
   { id: DocumentType.CV, label: "CV/Resume", icon: "briefcase" },
   { id: DocumentType.CoverLetter, label: "Cover Letter", icon: "mail" },
-  { id: DocumentType.Certificate, label: "Certificate(s)", icon: "award" },
+  { id: DocumentType.Qualification, label: "Qualifications", icon: "award" },
+  { id: DocumentType.NationalId, label: "National ID", icon: "credit-card" },
+  { id: DocumentType.DriversLicence, label: "Driver's Licence", icon: "credit-card" },
   { id: DocumentType.Other, label: "Other", icon: "file" },
 ];
 
@@ -45,9 +48,14 @@ export default function DocumentsManagement() {
   >("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
 
-  const { documents, loading, fetchDocuments, deleteDocument } = useDocuments(
-    user?.id
-  );
+  const {
+    documents,
+    loading,
+    fetchDocuments,
+    deleteDocument,
+    updateDocument,
+  } = useDocuments(user?.id);
+  const [savingDocumentId, setSavingDocumentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -110,6 +118,76 @@ export default function DocumentsManagement() {
     );
   };
 
+  const handleEditDocument = (document: Document) => {
+    openGlobalSheet({
+      snapPoints: ["65%"],
+      children: (
+        <DocumentEditSheet
+          document={document}
+          saving={savingDocumentId === document.id}
+          onSave={async ({ name, type }) => {
+            setSavingDocumentId(document.id);
+
+            try {
+              const { error } = await updateDocument(document.id, {
+                name,
+                type,
+              });
+
+              if (error) {
+                throw error;
+              }
+
+              await fetchDocuments(
+                selectedCategory === "all" ? undefined : selectedCategory
+              );
+
+              toast.show({
+                type: "success",
+                title: "Document Updated",
+                message: "Your document details were saved.",
+              });
+
+              openGlobalSheet({ snapPoints: ["1%"], children: <></> });
+            } catch (error: any) {
+              toast.show({
+                type: "danger",
+                title: "Update Failed",
+                message:
+                  error?.message || "Failed to update the document details.",
+              });
+            } finally {
+              setSavingDocumentId(null);
+            }
+          }}
+        />
+      ),
+    });
+  };
+
+  const handleDocumentActions = (document: Document) => {
+    Alert.alert(document.name || "Document", "Choose an action", [
+      {
+        text: "View",
+        onPress: () => {
+          void handleViewDocument(document);
+        },
+      },
+      {
+        text: "Edit",
+        onPress: () => handleEditDocument(document),
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          void handleDeleteDocument(document);
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   const getCategoryIcon = (category: DocumentType) => {
     const cat = DOCUMENT_CATEGORIES.find((c) => c.id === category);
     return cat?.icon || "file";
@@ -122,6 +200,12 @@ export default function DocumentsManagement() {
 
   const getCategoryCount = (category: DocumentType) => {
     return documents.filter((doc) => doc.type === category).length;
+  };
+
+  const handleUploadSuccess = async () => {
+    await fetchDocuments(
+      selectedCategory === "all" ? undefined : selectedCategory
+    );
   };
 
   return (
@@ -185,15 +269,15 @@ export default function DocumentsManagement() {
               </ThemedText>
             </ThemedView>
             <ThemedView style={[styles.statCard, { borderColor }]}>
-              <ThemedText style={styles.statNumber}>
-                {
-                  documents.filter(
-                    (doc) => doc.type === DocumentType.Certificate
+                <ThemedText style={styles.statNumber}>
+                  {
+                    documents.filter(
+                    (doc) => doc.type === DocumentType.Qualification
                   ).length
                 }
               </ThemedText>
               <ThemedText style={[styles.statLabel, { color: mutedTextColor }]}>
-                Certificate(s)
+                Qualifications
               </ThemedText>
             </ThemedView>
           </View>
@@ -280,17 +364,18 @@ export default function DocumentsManagement() {
                       maxHeight: 0.85,
                       padding: 50,
                     },
+                    onDismiss: () => {
+                      void fetchDocuments(
+                        selectedCategory === "all"
+                          ? undefined
+                          : selectedCategory
+                      );
+                    },
                     children: (
                       <DocumentManager
                         userId={user?.id}
                         documentType={category.id}
-                        onSuccess={() =>
-                          fetchDocuments(
-                            selectedCategory === "all"
-                              ? undefined
-                              : selectedCategory
-                          )
-                        }
+                        onSuccess={handleUploadSuccess}
                         disableScrolling={true}
                       />
                     ),
@@ -325,6 +410,13 @@ export default function DocumentsManagement() {
                 onPress={() => {
                   openGlobalSheet({
                     snapPoints: ["90%"],
+                    onDismiss: () => {
+                      void fetchDocuments(
+                        selectedCategory === "all"
+                          ? undefined
+                          : selectedCategory
+                      );
+                    },
                     children: (
                       <DocumentManager
                         userId={user?.id}
@@ -333,13 +425,7 @@ export default function DocumentsManagement() {
                             ? undefined
                             : selectedCategory
                         }
-                        onSuccess={() =>
-                          fetchDocuments(
-                            selectedCategory === "all"
-                              ? undefined
-                              : selectedCategory
-                          )
-                        }
+                        onSuccess={handleUploadSuccess}
                         disableScrolling={true}
                       />
                     ),
@@ -386,7 +472,7 @@ export default function DocumentsManagement() {
                   <DocumentCard
                     document={document}
                     onPress={() => handleViewDocument(document)}
-                    onDelete={() => handleDeleteDocument(document)}
+                    onPressMenu={() => handleDocumentActions(document)}
                     showCategory={true}
                     variant="detailed"
                   />

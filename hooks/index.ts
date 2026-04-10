@@ -1,5 +1,6 @@
 // Authentication & User Management
 export * from './auth';
+export * from './admin';
 
 // Posts & Content (Consolidated)
 export * from './posts';

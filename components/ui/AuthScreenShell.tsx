@@ -1,7 +1,14 @@
 import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks";
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  type ScrollViewProps,
+  StyleSheet,
+  View,
+} from "react-native";
 import ScreenContainer from "../ScreenContainer";
 import { ThemedText } from "../ThemedText";
 import { ThemedView } from "../ThemedView";
@@ -11,6 +18,8 @@ interface AuthScreenShellProps {
   subtitle: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  headerContent?: React.ReactNode;
+  scrollViewProps?: ScrollViewProps;
 }
 
 export default function AuthScreenShell({
@@ -18,49 +27,78 @@ export default function AuthScreenShell({
   subtitle,
   children,
   footer,
+  headerContent,
+  scrollViewProps,
 }: AuthScreenShellProps) {
   const scheme = useColorScheme() ?? "light";
   const color = Colors[scheme];
 
   return (
     <ScreenContainer>
-      <ThemedView style={styles.container}>
-        <View style={styles.hero}>
-          <ThemedText style={styles.title}>{title}</ThemedText>
-          <ThemedText style={[styles.subtitle, { color: color.mutedText }]}>
-            {subtitle}
-          </ThemedText>
-        </View>
-
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: color.backgroundSecondary,
-              borderColor: color.border,
-              shadowColor: color.shadow,
-            },
-          ]}
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+          {...scrollViewProps}
         >
-          {children}
-        </View>
+          <ThemedView style={styles.container}>
+            {headerContent ? <View style={styles.headerContent}>{headerContent}</View> : null}
+            <View style={styles.hero}>
+              <ThemedText style={styles.title}>{title}</ThemedText>
+              <ThemedText style={[styles.subtitle, { color: color.mutedText }]}>
+                {subtitle}
+              </ThemedText>
+            </View>
 
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
-      </ThemedView>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: color.backgroundSecondary,
+                  borderColor: color.border,
+                  shadowColor: color.shadow,
+                },
+              ]}
+            >
+              {children}
+            </View>
+
+            {footer ? <View style={styles.footer}>{footer}</View> : null}
+          </ThemedView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  keyboardContainer: {
     flex: 1,
-    justifyContent: "center",
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
+  container: {
+    flexGrow: 1,
+    justifyContent: "flex-start",
     paddingHorizontal: 20,
-    paddingVertical: 28,
+    paddingTop: 40,
+    paddingBottom: 28,
     gap: 20,
   },
   hero: {
     gap: 10,
+  },
+  headerContent: {
+    alignItems: "flex-start",
   },
   title: {
     fontSize: 32,

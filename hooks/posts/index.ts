@@ -12,7 +12,7 @@ export {
 
 // Consolidated interaction hooks
 export { useInteractions } from './useInteractions';
-export { useComments } from './useComments';
+export { useComments, formatCommentDate } from './useComments';
 
 // Additional post hooks
 export { usePostOperations } from './usePostOperations';

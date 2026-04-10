@@ -4,6 +4,7 @@ import { Colors } from "@/constants/Colors";
 import { useColorScheme } from "@/hooks";
 import { supabase } from "@/utils/supabase";
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -32,8 +33,9 @@ export default function ForgotPasswordScreen() {
     setSubmitting(true);
 
     try {
+      const redirectTo = Linking.createURL("/auth/reset-password");
       const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: "growork://auth/reset-password",
+        redirectTo,
       });
 
       if (error) {

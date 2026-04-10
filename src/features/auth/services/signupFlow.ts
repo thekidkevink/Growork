@@ -18,7 +18,7 @@ export function buildSignupFlow() {
       {
         key: 'profile',
         route: signupRoutes.profile,
-        fields: ['username', 'firstName', 'surname'] as const,
+        fields: ['firstName', 'surname', 'dateOfBirth', 'contactNumber'] as const,
       },
       {
         key: 'success',
@@ -37,9 +37,10 @@ export function mapSignupPayload(
     email: credentials.email.trim().toLowerCase(),
     password: credentials.password,
     metadata: {
-      username: profile.username.trim(),
       name: profile.firstName.trim(),
       surname: profile.surname.trim(),
+      date_of_birth: profile.dateOfBirth.trim(),
+      phone: profile.contactNumber.trim(),
     },
   };
 }

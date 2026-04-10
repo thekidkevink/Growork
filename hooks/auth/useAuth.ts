@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../../utils/supabase';
 import { supabaseRequest } from '../../utils/supabaseRequest';
-import { ensureUserProfile } from '../../utils/profileUtils';
+import { createProfileIfNotExists, ensureUserProfile } from '../../utils/profileUtils';
 import { useAuthOperations } from './useAuthOperations';
 import type { Profile } from '../../types';
 
@@ -77,6 +77,31 @@ const isAuthLockTimeoutError = (err: any): boolean => {
   );
 };
 
+const getProfileSeedFromUser = (user: User) => {
+  const metadata = user.user_metadata || {};
+
+  return {
+    name: String(metadata.name || '').trim(),
+    surname: String(metadata.surname || '').trim(),
+    date_of_birth: String(metadata.date_of_birth || '').trim() || null,
+    phone: String(metadata.phone || '').trim() || null,
+  };
+};
+
+const needsProfileSeedSync = (
+  profile: Profile | null,
+  seed: ReturnType<typeof getProfileSeedFromUser>
+) => {
+  if (!profile) return false;
+
+  return (
+    (!!seed.name && !profile.name?.trim()) ||
+    (!!seed.surname && !profile.surname?.trim()) ||
+    (!!seed.date_of_birth && !profile.date_of_birth) ||
+    (!!seed.phone && !profile.phone?.trim())
+  );
+};
+
 const fetchUserProfile = async (userId: string): Promise<Profile | null> => {
   if (profileFetchPromise && profileFetchUserId === userId) {
     return profileFetchPromise;
@@ -130,7 +155,26 @@ const loadProfileForSession = async (session: Session | null) => {
     error: null,
   });
 
-  const profile = await fetchUserProfile(session.user.id);
+  const seed = getProfileSeedFromUser(session.user);
+  let profile = await fetchUserProfile(session.user.id);
+
+  if (
+    profile &&
+    (seed.name || seed.surname || seed.date_of_birth || seed.phone) &&
+    needsProfileSeedSync(profile, seed)
+  ) {
+    const syncedProfile = await createProfileIfNotExists(session.user.id, {
+      name: seed.name || profile.name || '',
+      surname: seed.surname || profile.surname || '',
+      date_of_birth: seed.date_of_birth,
+      phone: seed.phone,
+      user_type: profile.user_type,
+    });
+
+    if (syncedProfile) {
+      profile = syncedProfile;
+    }
+  }
 
   setAuthState({
     profile,

@@ -20,14 +20,18 @@ import ActionPromptModal from "@/components/ui/ActionPromptModal";
 const DOCUMENT_FILTERS = [
   { icon: "briefcase", label: "CV" },
   { icon: "mail", label: "Cover Letter" },
-  { icon: "award", label: "Certificate(s)" },
+  { icon: "award", label: "Qualifications" },
+  { icon: "credit-card", label: "National ID" },
+  { icon: "credit-card", label: "Driver's Licence" },
   { icon: "file", label: "Other" },
 ];
 
 const ALL_DOCUMENT_OPTIONS = [
   { icon: "briefcase", label: "CV" },
   { icon: "mail", label: "Cover Letter" },
-  { icon: "award", label: "Certificate(s)" },
+  { icon: "award", label: "Qualifications" },
+  { icon: "credit-card", label: "National ID" },
+  { icon: "credit-card", label: "Driver's Licence" },
   { icon: "file", label: "Other" },
 ];
 
@@ -52,7 +56,9 @@ function filterDocumentsByCategory(
     const categoryMapping: Record<string, string[]> = {
       cv: ["cv", "resume"],
       "cover letter": ["cover_letter", "coverletter"],
-      "certificate(s)": ["certificate", "cert", "diploma", "achievement"],
+      qualifications: ["qualification", "certificate", "cert", "diploma", "achievement"],
+      "national id": ["national_id"],
+      "driver's licence": ["drivers_licence", "drivers_license", "licence", "license"],
       other: ["other", "other_document"],
     };
 
@@ -283,7 +289,7 @@ function DocumentsListInner({
               No Documents Yet
             </ThemedText>
             <ThemedText style={[styles.emptyDescription, { color: mutedText }]}>
-              Tap to upload your CV, cover letter, certificate(s), and other documents
+              Tap to upload your CV, cover letter, qualifications, national ID, driver's licence, and other documents
             </ThemedText>
           </Pressable>
         ) : (

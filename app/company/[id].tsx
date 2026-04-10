@@ -22,6 +22,7 @@ import { useCompanyFollows } from "../../hooks/companies/useCompanyFollows";
 import { useAuth } from "../../hooks/auth";
 import { useThemeColor } from "../../hooks";
 import { useCompanyPosts } from "../../hooks/posts";
+import { supabase } from "../../utils/supabase";
 
 export default function CompanyDetailsScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -42,6 +43,7 @@ export default function CompanyDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
 
   // Calculate counts from the actual posts data
   const postsCount = posts?.length || 0;
@@ -71,6 +73,15 @@ export default function CompanyDetailsScreen() {
           // Check if user is following this company
           const followingStatus = await isFollowingCompany(id);
           setIsFollowing(followingStatus);
+
+          const { count, error: followersError } = await supabase
+            .from("company_follows")
+            .select("id", { count: "exact", head: true })
+            .eq("company_id", id);
+
+          if (!followersError) {
+            setFollowersCount(count || 0);
+          }
         }
       } catch (_error) {
         setCompany(null);
@@ -92,11 +103,13 @@ export default function CompanyDetailsScreen() {
         const result = await unfollowCompany(id);
         if (!result.error) {
           setIsFollowing(false);
+          setFollowersCount((current) => Math.max(current - 1, 0));
         }
       } else {
         const result = await followCompany(id);
         if (!result.error) {
           setIsFollowing(true);
+          setFollowersCount((current) => current + 1);
         }
       }
     } catch (_error) {
@@ -209,6 +222,7 @@ export default function CompanyDetailsScreen() {
           isFollowing={isFollowing}
           onFollowToggle={handleFollowToggle}
           loading={followLoading}
+          followersCount={followersCount}
           postsCount={postsCount}
           jobsCount={jobsCount}
         />

@@ -10,11 +10,13 @@ export type PermissionAction =
     | 'apply:job'
     | 'manage:company'
     | 'view:analytics'
+    | 'review:business-requests'
     | string;
 
 
 export interface Permissions {
     isAuthenticated: boolean;
+    isAdmin: boolean;
     isBusinessUser: boolean;
     isRegularUser: boolean;
     userType: UserType | undefined;
@@ -38,14 +40,15 @@ export function usePermissions(): Permissions & { refresh: () => Promise<void> }
     const capabilitySnapshot = useMemo(
       () =>
         buildCapabilitySnapshot({
-          profileRole: null,
+          profileRole: profile?.profile_role ?? null,
           userType: userType ?? null,
           ownedCompanyIds: companies.map((company) => company.id),
           managedCompanyIds: companies.map((company) => company.id),
         }),
-      [companies, userType]
+      [companies, profile?.profile_role, userType]
     );
 
+    const isAdmin = capabilitySnapshot.isAdmin;
     const isBusinessUser = capabilitySnapshot.hasBusinessCapability;
     const isRegularUser =
       isAuthenticated && !capabilitySnapshot.hasBusinessCapability && !capabilitySnapshot.isAdmin;
@@ -61,6 +64,9 @@ export function usePermissions(): Permissions & { refresh: () => Promise<void> }
 
             case 'manage:applicants':
                 return capabilitySnapshot.canManageApplicants;
+
+            case 'review:business-requests':
+                return capabilitySnapshot.isAdmin;
 
             case 'apply:job':
                 return isAuthenticated; // Allow signed-in users to apply
@@ -79,6 +85,7 @@ export function usePermissions(): Permissions & { refresh: () => Promise<void> }
 
     return {
         isAuthenticated,
+        isAdmin,
         isBusinessUser,
         isRegularUser,
         userType,
