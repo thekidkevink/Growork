@@ -12,10 +12,14 @@ import { Feather } from "@expo/vector-icons";
 
 import ScreenContainer from "@/components/ScreenContainer";
 import SettingsList from "@/components/ui/SettingsList";
+import ActionPromptModal from "@/components/ui/ActionPromptModal";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useAuth, useBusinessRequests, useThemeColor } from "@/hooks";
 import { useFlashToast } from "@/components/ui/Flash";
+
+const BUSINESS_REQUEST_TERMS_MESSAGE =
+  "By continuing, you agree to the GROWORK Terms of Use and acknowledge the Privacy Policy.\n\nYou confirm that the information you submit is accurate, that you will use the platform responsibly, not misuse data or other users, and comply with Namibian law.\n\nYou also understand that GROWORK collects and uses personal, document, and company information to review requests, match jobs, improve services, communicate with users, and may share relevant data with employers or display public content as described in the Privacy Policy.";
 
 export default function BusinessRequestScreen() {
   const router = useRouter();
@@ -44,8 +48,11 @@ export default function BusinessRequestScreen() {
     location: profile?.location || "",
     message: "",
   });
+  const [hasAcceptedBusinessTerms, setHasAcceptedBusinessTerms] =
+    React.useState(false);
 
   const hasPendingRequest = myLatestRequest?.status === "pending";
+  const shouldRequireBusinessConsent = !myRequestLoading && !hasPendingRequest;
 
   React.useEffect(() => {
     if (!myLatestRequest) return;
@@ -63,6 +70,16 @@ export default function BusinessRequestScreen() {
   }, [myLatestRequest]);
 
   const handleSubmit = async () => {
+    if (shouldRequireBusinessConsent && !hasAcceptedBusinessTerms) {
+      toast.show({
+        type: "info",
+        title: "Accept terms first",
+        message:
+          "Please accept the business request terms before filling in and submitting this form.",
+      });
+      return;
+    }
+
     if (hasPendingRequest) {
       toast.show({
         type: "info",
@@ -162,6 +179,15 @@ export default function BusinessRequestScreen() {
 
   return (
     <ScreenContainer>
+      <ActionPromptModal
+        visible={shouldRequireBusinessConsent && !hasAcceptedBusinessTerms}
+        title="Accept Terms of Use"
+        message={BUSINESS_REQUEST_TERMS_MESSAGE}
+        cancelLabel="Not now"
+        confirmLabel="I Accept"
+        onCancel={() => router.back()}
+        onConfirm={() => setHasAcceptedBusinessTerms(true)}
+      />
       <StatusBar
         barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
       />
@@ -174,13 +200,19 @@ export default function BusinessRequestScreen() {
         <TouchableOpacity
           style={styles.submitButton}
           onPress={handleSubmit}
-          disabled={submitting || hasPendingRequest}
+          disabled={
+            submitting ||
+            hasPendingRequest ||
+            (shouldRequireBusinessConsent && !hasAcceptedBusinessTerms)
+          }
         >
           <ThemedText style={[styles.submitButtonText, { color: tintColor }]}>
             {myRequestLoading
               ? "Loading..."
               : hasPendingRequest
               ? "Pending"
+              : shouldRequireBusinessConsent && !hasAcceptedBusinessTerms
+              ? "Locked"
               : submitting
               ? "Sending..."
               : myLatestRequest?.status === "rejected"
@@ -265,7 +297,7 @@ export default function BusinessRequestScreen() {
             : "Submit your business account request for review. Once approved, your account can create companies, publish job listings, and manage incoming applicants."}
         </ThemedText>
 
-        {!hasPendingRequest ? (
+        {!hasPendingRequest && hasAcceptedBusinessTerms ? (
           <SettingsList
             sections={[
               {
@@ -350,6 +382,30 @@ export default function BusinessRequestScreen() {
               },
             ]}
           />
+        ) : !hasPendingRequest ? (
+          <ThemedView
+            style={[
+              styles.termsCard,
+              { borderColor, backgroundColor: backgroundSecondary },
+            ]}
+          >
+            <ThemedText style={styles.termsTitle}>
+              Business request terms required
+            </ThemedText>
+            <ThemedText
+              style={[styles.termsMessage, { color: mutedTextColor }]}
+            >
+              Accept the GROWORK Terms of Use and Privacy Policy to unlock the business request form.
+            </ThemedText>
+            <TouchableOpacity
+              style={[styles.termsButton, { borderColor }]}
+              onPress={() => setHasAcceptedBusinessTerms(true)}
+            >
+              <ThemedText style={[styles.termsButtonText, { color: textColor }]}>
+                Review and Accept
+              </ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
         ) : null}
       </View>
         </>
@@ -383,6 +439,33 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  termsCard: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 10,
+  },
+  termsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  termsMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  termsButton: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  termsButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   loadingState: {
     flex: 1,
